@@ -90,4 +90,37 @@ describe("nested thread drop targets", () => {
       await mounted.unmount();
     }
   });
+
+  it("keeps a preview through transcript updates and clears it when the pane changes", async () => {
+    const onSplit = vi.fn();
+    const paneView = (scope: string, transcript: string) => (
+      <ChatPaneDropOverlay onDrop={onSplit} paneScopeId={scope} className="h-[300px] w-[500px]">
+        {transcript}
+      </ChatPaneDropOverlay>
+    );
+    const mounted = await render(paneView("first", "Initial transcript"));
+    try {
+      const pane = mounted.container.querySelector<HTMLElement>("[data-chat-pane-drop-overlay]")!;
+      const rect = pane.getBoundingClientRect();
+      const transfer = new DataTransfer();
+      transfer.setData(THREAD_DRAG_MIME, '{"threadId":"source"}');
+      pane.dispatchEvent(
+        new DragEvent("dragenter", {
+          bubbles: true,
+          cancelable: true,
+          dataTransfer: transfer,
+          clientX: rect.left + 1,
+          clientY: rect.top + rect.height / 2,
+        }),
+      );
+      expect(pane.querySelector("[data-chat-pane-drop-zone]")).not.toBeNull();
+      await mounted.rerender(paneView("first", "Streaming transcript update"));
+      expect(pane.querySelector("[data-chat-pane-drop-zone]")).not.toBeNull();
+      await mounted.rerender(paneView("second", "Another pane"));
+      expect(pane.querySelector("[data-chat-pane-drop-zone]")).toBeNull();
+      expect(onSplit).not.toHaveBeenCalled();
+    } finally {
+      await mounted.unmount();
+    }
+  });
 });

@@ -3,7 +3,13 @@
 // Layer: UI component (route surfaces wrap it around <ChatView /> or empty-state placeholders)
 // Exports: ChatPaneDropOverlay component, drag MIME constant, drop-zone helpers used by tests
 
-import { useEffect, useRef, type DragEvent as ReactDragEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type DragEvent as ReactDragEvent,
+  type ReactNode,
+} from "react";
 import { type ThreadId } from "@synara/contracts";
 
 import { type SplitDirection, type SplitDropSide } from "../../splitViewStore";
@@ -145,7 +151,7 @@ export function ChatPaneDropOverlay(props: ChatPaneDropOverlayProps) {
     return canDropInDirection ? canDropInDirection(direction) : true;
   };
 
-  const setPreviewZone = (zone: DropZone | null) => {
+  const setPreviewZone = useCallback((zone: DropZone | null) => {
     const preview = previewRef.current;
     if (!preview) return;
     const nextClassName = zone
@@ -160,13 +166,13 @@ export function ChatPaneDropOverlay(props: ChatPaneDropOverlayProps) {
     }
     preview.dataset.chatPaneDropZone = zone;
     preview.className = nextClassName;
-  };
+  }, []);
 
-  const resetOverlayState = () => {
+  const resetOverlayState = useCallback(() => {
     rectRef.current = null;
     rectMeasuredAtRef.current = 0;
     setPreviewZone(null);
-  };
+  }, [setPreviewZone]);
 
   const getCurrentRect = () => {
     const wrapper = wrapperRef.current;
