@@ -156,6 +156,7 @@ function KanbanColumnComponent({
       <li key={card.cardId} className="list-none">
         <KanbanCardView
           card={card}
+          threadDraggable
           onOpen={onOpenCard}
           {...(onCardContextMenu ? { onContextMenu: onCardContextMenu } : {})}
           {...(onCardKeyDown ? { onKeyDown: onCardKeyDown } : {})}

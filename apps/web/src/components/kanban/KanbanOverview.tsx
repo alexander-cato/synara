@@ -9,6 +9,7 @@ import type { ProjectId } from "@synara/contracts";
 import { Button } from "~/components/ui/button";
 import { ChevronRightIcon, PlusIcon } from "~/lib/icons";
 import { cn } from "~/lib/utils";
+import { beginProjectDrag } from "~/lib/projectDrag";
 import type { KanbanViewMode } from "../../kanbanUiStore";
 import { KanbanCardView, type KanbanCardPrLookup } from "./KanbanCardView";
 import { NeedsReviewFilter } from "./NeedsReviewFilter";
@@ -45,6 +46,15 @@ const OverviewProjectColumn = function OverviewProjectColumn({
       <div className="flex shrink-0 items-center gap-1">
         <button
           type="button"
+          draggable={projectBoard.projectKind === "project"}
+          data-project-drag-id={
+            projectBoard.projectKind === "project" ? projectBoard.projectId : undefined
+          }
+          onDragStart={
+            projectBoard.projectKind === "project"
+              ? (event) => beginProjectDrag(event.dataTransfer, projectBoard.projectId)
+              : undefined
+          }
           onClick={() => onOpenProject(projectBoard.projectId)}
           className={cn(
             "group/kanban-project flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors",
@@ -75,6 +85,7 @@ const OverviewProjectColumn = function OverviewProjectColumn({
           <li key={card.cardId} className="list-none">
             <KanbanCardView
               card={card}
+              threadDraggable
               onOpen={onOpenCard}
               prByThreadId={prByThreadId}
               {...(onCardContextMenu ? { onContextMenu: onCardContextMenu } : {})}

@@ -73,6 +73,10 @@ composer; it is not sent twice.
   ordinary project; local composer drafts remain client-only. Gateway draft creation uses
   the local checkout; isolated worktree callers can create a task instead. These tools do
   not change the Tasks to-do records; the `synara_*_todo` tools do.
+  Drag a project heading from the Kanban overview onto a pinned space to move the project.
+  Saved chat cards in the overview and outside a project board's sortable Draft column can
+  be dragged to the same tab, mention, and split destinations as sidebar chat rows. Sortable
+  Draft cards keep their reorder and dispatch gesture; local drafts are not chat references.
 - **Inbox** (Stable and Beta) — chats needing attention, running and finished work, review
   requests, and the day’s agent recap, starting at 4am. Inbox also shows today’s due and overdue
   to-dos: add one due today, or select it to edit and delegate through the same card as Tasks.

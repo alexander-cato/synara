@@ -1,7 +1,7 @@
 // Real-chromium render of the v2 attention-first board over seeded state.
 import "../../index.css";
 
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
@@ -63,10 +63,15 @@ vi.mock("./useKanbanBoard", () => ({
   useKanbanBoard: () => ({ projects: [board], totalCount: board.totalCount }),
 }));
 
-import type { ServerProviderStatus, ThreadId } from "@synara/contracts";
+import type { ProjectId, ServerProviderStatus, ThreadId } from "@synara/contracts";
 import { KANBAN_ATTENTION_LABELS, KANBAN_COLUMN_V2_LABELS } from "@synara/shared/kanban";
 import { dispatchKanbanDraftCardAsGoal } from "../../lib/kanbanDispatch";
 import { KanbanProjectBoardView } from "./KanbanProjectBoardView";
+import { KanbanOverview } from "./KanbanOverview";
+import { KanbanCardView } from "./KanbanCardView";
+import { useProjectDropTarget } from "~/hooks/useProjectDropTarget";
+import { SurfaceContentTabs } from "../chat/SurfaceContentTabs";
+import { endThreadDrag, getActiveThreadDragId } from "~/lib/threadDrag";
 import { buildKanbanBoard, type KanbanCard, type KanbanProjectBoard } from "./kanban.logic";
 import type { SidebarThreadSummary } from "../../types";
 import KanbanView from "./KanbanView";
@@ -74,6 +79,11 @@ import { useKanbanUiStore } from "../../kanbanUiStore";
 import type { KanbanCardContextMenuController } from "./useKanbanCardContextMenu";
 
 const dispatchAsGoalMock = vi.mocked(dispatchKanbanDraftCardAsGoal);
+
+function SpaceDropReceiver({ onProjectDrop }: { onProjectDrop: (projectId: ProjectId) => void }) {
+  const { projectDropProps } = useProjectDropTarget(onProjectDrop);
+  return <button {...projectDropProps}>Work</button>;
+}
 
 // A usable provider status: with no usable status the drop handler toasts
 // "Provider status is still loading" and never reaches the dispatch call.
@@ -205,6 +215,122 @@ beforeEach(() => {
 });
 
 describe("KanbanProjectBoardView v2 (browser)", () => {
+  it("files a project into a pinned space by dragging its overview heading", async () => {
+    const onProjectDrop = vi.fn();
+    const onOpenProject = vi.fn();
+    const screen = await render(
+      <div className="flex gap-8 p-4">
+        <KanbanOverview
+          board={{ projects: [board], totalCount: board.totalCount }}
+          onOpenProject={onOpenProject}
+          onOpenCard={vi.fn()}
+          onNewTask={vi.fn()}
+          prByThreadId={new Map()}
+          viewMode="v2"
+        />
+        <SpaceDropReceiver onProjectDrop={onProjectDrop} />
+      </div>,
+    );
+    try {
+      await userEvent.dragAndDrop(
+        page.getByRole("heading", { name: "Demo", exact: true }).element().closest("button")!,
+        page.getByRole("button", { name: "Work", exact: true }),
+      );
+      expect(onProjectDrop).toHaveBeenCalledExactlyOnceWith(board.projectId);
+      expect(onOpenProject).not.toHaveBeenCalled();
+    } finally {
+      await screen.unmount();
+    }
+  });
+
+  it("drags a saved run card to chat tabs without dispatching or changing board state", async () => {
+    dispatchAsGoalMock.mockClear();
+    const onThreadDrop = vi.fn();
+    const onOpenCard = vi.fn();
+    const saved = makeCard("saved-run", "inProgress", {
+      thread: {
+        id: "saved-run",
+        projectId: board.projectId,
+        title: "Saved run",
+        branch: null,
+        archivedAt: null,
+        latestTurn: null,
+        session: null,
+        modelSelection: { provider: "codex", model: "gpt-5.4" },
+      } as unknown as SidebarThreadSummary,
+    });
+    const savedBoard = { ...board, inProgress: [saved] };
+    const screen = await render(
+      <div className="flex flex-col gap-8 p-4">
+        <SurfaceContentTabs
+          ariaLabel="Open threads"
+          activeKey="open"
+          onThreadDrop={onThreadDrop}
+          tabs={[{ key: "open", title: "Open chat", icon: <span />, onSelect: vi.fn() }]}
+        />
+        <KanbanProjectBoardView
+          board={savedBoard}
+          onOpenCard={onOpenCard}
+          onNewTask={vi.fn()}
+          viewMode="v2"
+          prByThreadId={new Map()}
+        />
+      </div>,
+    );
+    try {
+      await userEvent.dragAndDrop(
+        findCardButton(saved.title)!,
+        page.getByRole("navigation", { name: "Open threads" }),
+      );
+      expect(onThreadDrop).toHaveBeenCalledExactlyOnceWith(saved.threadId);
+      expect(onOpenCard).not.toHaveBeenCalled();
+      expect(dispatchAsGoalMock).not.toHaveBeenCalled();
+      expect(savedBoard.inProgress).toEqual([saved]);
+      expect(getActiveThreadDragId()).toBeNull();
+    } finally {
+      endThreadDrag();
+      await screen.unmount();
+    }
+  });
+
+  it("keeps native drags off local drafts, sortable drafts, overlays, and special projects", async () => {
+    const savedDraft = makeCard("saved-draft", "draft", {
+      thread: { archivedAt: null } as SidebarThreadSummary,
+    });
+    const screen = await render(
+      <div>
+        <KanbanProjectBoardView
+          board={{ ...board, draft: [savedDraft] }}
+          onOpenCard={vi.fn()}
+          onNewTask={vi.fn()}
+          viewMode="v2"
+          prByThreadId={new Map()}
+        />
+        <KanbanCardView card={savedDraft} isOverlay threadDraggable prByThreadId={new Map()} />
+        <KanbanCardView
+          card={makeCard("local-draft", "draft")}
+          threadDraggable
+          prByThreadId={new Map()}
+        />
+        <KanbanOverview
+          board={{ projects: [{ ...board, projectKind: "group" }], totalCount: board.totalCount }}
+          onOpenProject={vi.fn()}
+          onOpenCard={vi.fn()}
+          onNewTask={vi.fn()}
+          prByThreadId={new Map()}
+          viewMode="v2"
+        />
+      </div>,
+    );
+    try {
+      expect(
+        Array.from(screen.container.querySelectorAll<HTMLButtonElement>("button[draggable=true]")),
+      ).toEqual([]);
+    } finally {
+      await screen.unmount();
+    }
+  });
+
   it("lets users select Classic in the page header and remembers it on remount", async () => {
     const screen = await render(<KanbanView projectId="project-1" />);
     try {
