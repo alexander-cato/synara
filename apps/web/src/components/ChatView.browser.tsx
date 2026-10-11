@@ -13450,6 +13450,9 @@ describe("ChatView transcript geometry (full app)", () => {
           )
           .toHaveAttribute("aria-current", "page");
         expect(mounted.router.state.location.search.splitViewId).toBeUndefined();
+        await expect
+          .poll(() => document.querySelectorAll("[data-chat-pane-drop-zone]").length)
+          .toBe(0);
       } else {
         await expect
           .poll(() => useComposerDraftStore.getState().draftsByThreadId[THREAD_ID]?.mentions)

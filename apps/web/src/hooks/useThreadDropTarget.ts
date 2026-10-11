@@ -5,8 +5,9 @@ import {
   getActiveThreadDragId,
   isThreadDragTransfer,
   readThreadDragPayload,
+  THREAD_DROP_TARGET_ATTRIBUTE,
 } from "~/lib/threadDrag";
-import { isComposerDropzoneInternalDragTransition } from "./useComposerDropzone";
+import { isInternalDragTransition } from "~/lib/dragTransition";
 
 /** Native thread drops shared by composer mentions and opening chat tabs. */
 export function useThreadDropTarget(input: {
@@ -30,7 +31,7 @@ export function useThreadDropTarget(input: {
   const onDragLeave = (event: DragEvent<HTMLElement>) => {
     if (
       !isThreadDragTransfer(event.dataTransfer) ||
-      isComposerDropzoneInternalDragTransition(event.currentTarget, event.relatedTarget)
+      isInternalDragTransition(event.currentTarget, event.relatedTarget)
     )
       return;
     setIsThreadOver(false);
@@ -60,6 +61,7 @@ export function useThreadDropTarget(input: {
   return {
     isThreadOver,
     threadDropProps: {
+      ...(!disabled ? { [THREAD_DROP_TARGET_ATTRIBUTE]: "true" } : {}),
       onDragEnter: onDragEnterOrOver,
       onDragOver: onDragEnterOrOver,
       onDragLeave,
