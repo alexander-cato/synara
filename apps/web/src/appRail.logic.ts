@@ -240,8 +240,7 @@ export interface RailSpacesSection<T> {
 /**
  * Spaces panel sections in the shared picker order (active space, Void, the rest, then
  * spaces the snapshot has not caught up with). Empty spaces stay listed so they can show
- * their empty state; an empty Void is dropped because it is only the unfiled bucket,
- * unless it is the only section there is.
+ * their empty state. Void stays listed too, so projects can be dropped there to unfile them.
  */
 export function buildRailSpacesSections<T>(input: {
   items: ReadonlyArray<T>;
@@ -258,7 +257,6 @@ export function buildRailSpacesSections<T>(input: {
     const key = spaceKey(spaceId);
     orderedKeys.add(key);
     const group = groupByKey.get(key);
-    if (!group && spaceId === null) continue;
     sections.push({
       key,
       spaceId,

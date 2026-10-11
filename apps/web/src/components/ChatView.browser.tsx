@@ -3937,6 +3937,79 @@ describe("ChatView transcript geometry (full app)", () => {
     }
   });
 
+  it.each(["empty space", "populated space", "Void"])(
+    "moves projects by dropping onto the catalog's %s section",
+    async (destination) => {
+      const spaceId = SpaceId.makeUnsafe("catalog-destination");
+      const snapshot = withOpenProjectPickerFixtures(
+        createSnapshotForTargetUser({
+          targetMessageId: MessageId.makeUnsafe("catalog-drop"),
+          targetText: "Catalog drop",
+        }),
+      );
+      const mounted = await mountChatView({
+        viewport: DEFAULT_VIEWPORT,
+        snapshot: {
+          ...snapshot,
+          spaces: [
+            {
+              id: spaceId,
+              name: "Destination",
+              icon: "bag",
+              sortOrder: 0,
+              createdAt: NOW_ISO,
+              updatedAt: NOW_ISO,
+              deletedAt: null,
+            },
+          ],
+          projects: snapshot.projects.map((project) => ({
+            ...project,
+            spaceId:
+              destination === "Void" ||
+              (destination === "populated space" && project.id === OTHER_PROJECT_ID)
+                ? spaceId
+                : null,
+          })),
+        },
+      });
+      try {
+        await page
+          .getByRole("navigation", { name: "Primary" })
+          .getByRole("button", { name: "Spaces", exact: true })
+          .click();
+        const row = await waitForElement(
+          () =>
+            document.querySelector<HTMLButtonElement>(
+              '[data-slot="sidebar-container"] [data-project-drag-id="project-1"]',
+            ),
+          "Catalog project missing",
+        );
+        const target = page.getByRole("region", {
+          name: destination === "Void" ? "Void projects" : "Destination projects",
+          exact: true,
+        });
+        await userEvent.dragAndDrop(row, target);
+        await expect
+          .poll(() =>
+            wsRequests
+              .map(readDispatchedCommand)
+              .find(
+                (command) =>
+                  command?.type === "project.meta.update" && command.projectId === PROJECT_ID,
+              ),
+          )
+          .toMatchObject({ spaceId: destination === "Void" ? null : spaceId });
+        expect(mounted.router.state.location.pathname).toBe(`/${THREAD_ID}`);
+        await expect.element(target).not.toHaveClass(/ring-ring/);
+      } finally {
+        await mounted.cleanup();
+        useSpacesUiStore.getState().setActiveSpaceId(null);
+        useRailShellStore.getState().closeSpacesProject();
+        useRailShellStore.getState().selectPanelItem("home");
+      }
+    },
+  );
+
   it("creates a project in the rail Space whose Add project button was clicked", async () => {
     const currentSpaceId = SpaceId.makeUnsafe("rail-current");
     const destinationSpaceId = SpaceId.makeUnsafe("rail-destination");

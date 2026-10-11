@@ -516,6 +516,7 @@ import { SpaceEmptyState } from "./SpaceEmptyState";
 import { SpaceIcon } from "./SpaceIcon";
 import { SpaceProjectPickerDialog } from "./SpaceProjectPickerDialog";
 import { SpaceSwitcher, type SpaceActivityTone } from "./SpaceSwitcher";
+import { SidebarProjectDropSection } from "./SidebarListSection";
 import { beginProjectDrag } from "~/lib/projectDrag";
 import {
   SIDEBAR_CONTEXT_MENU_ICON_CLASS_NAME,
@@ -5910,7 +5911,13 @@ export default function Sidebar() {
       <SidebarGroup className="px-1.5 py-1.5">
         {threadsHydrated
           ? railSpacesSections.map((section) => (
-              <div key={section.key}>
+              <SidebarProjectDropSection
+                key={section.key}
+                label={`${section.name} projects`}
+                onProjectDrop={(projectId) =>
+                  void handleMoveProjectToSpace(projectId, section.spaceId)
+                }
+              >
                 {renderListSectionHeader(
                   section.name,
                   <SidebarIconButton
@@ -5937,7 +5944,7 @@ export default function Sidebar() {
                     }}
                   />
                 )}
-              </div>
+              </SidebarProjectDropSection>
             ))
           : null}
       </SidebarGroup>

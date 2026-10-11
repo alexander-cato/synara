@@ -7,12 +7,39 @@
 // Exports: SidebarSectionLabel, SidebarCollapsibleSection, SidebarShowMoreRow
 
 import { Children, type MouseEvent, type ReactNode } from "react";
+import type { ProjectId } from "@synara/contracts";
+import { useProjectDropTarget } from "~/hooks/useProjectDropTarget";
 
 import { cn } from "~/lib/utils";
 import { SIDEBAR_ROW_FOCUS_CLASS_NAME, SIDEBAR_SECTION_LABEL_CLASS_NAME } from "~/sidebarRowStyles";
 import type { SidebarRowContextMenuPosition } from "./sidebarThreadRowGestures";
 import { DisclosureChevron } from "./ui/DisclosureChevron";
 import { DisclosureRegion } from "./ui/DisclosureRegion";
+
+/** A whole Space section accepts projects, including its header and empty state. */
+export function SidebarProjectDropSection({
+  label,
+  onProjectDrop,
+  children,
+}: {
+  label: string;
+  onProjectDrop: (projectId: ProjectId) => void;
+  children: ReactNode;
+}) {
+  const { isProjectOver, projectDropProps } = useProjectDropTarget(onProjectDrop);
+  return (
+    <section
+      aria-label={label}
+      {...projectDropProps}
+      className={cn(
+        "rounded-md",
+        isProjectOver && "bg-[var(--sidebar-accent)] ring-1 ring-ring ring-inset",
+      )}
+    >
+      {children}
+    </section>
+  );
+}
 
 /** A section's title where the section cannot fold (Pinned, date buckets, project blocks). */
 export function SidebarSectionLabel({

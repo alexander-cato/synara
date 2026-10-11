@@ -35,6 +35,8 @@ composer; it is not sent twice.
   dropping onto Void removes its space assignment. Drops do not open another chat.
   Project rows in the Spaces catalog and pinned project shortcuts also support these moves.
   With manual project sorting, drag the row to move spaces or its reorder grip to change list order.
+  In the Spaces catalog, each space section accepts drops across its header, project list,
+  and empty state, so spaces do not need a pinned shortcut to receive projects.
   Open saved threads appear as tabs across the top of the chat. Unsent drafts stay out of
   the tab strip until they become saved threads on the first send. Saved tabs remain
   available to return to while an unsent draft is on screen, including in the editor view.
