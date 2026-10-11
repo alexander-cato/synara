@@ -515,7 +515,8 @@ import { useSpacesController } from "./useSpacesController";
 import { SpaceEmptyState } from "./SpaceEmptyState";
 import { SpaceIcon } from "./SpaceIcon";
 import { SpaceProjectPickerDialog } from "./SpaceProjectPickerDialog";
-import { PROJECT_SPACE_DRAG_MIME, SpaceSwitcher, type SpaceActivityTone } from "./SpaceSwitcher";
+import { SpaceSwitcher, type SpaceActivityTone } from "./SpaceSwitcher";
+import { beginProjectDrag } from "~/lib/projectDrag";
 import {
   SIDEBAR_CONTEXT_MENU_ICON_CLASS_NAME,
   SIDEBAR_CONTEXT_MENU_ITEM_CLASS_NAME,
@@ -5702,11 +5703,7 @@ export default function Sidebar() {
                     // drag gesture there for reordering.
                     draggable: true,
                     onDragStart: (event: ReactDragEvent<HTMLButtonElement>) => {
-                      event.dataTransfer.effectAllowed = "move";
-                      event.dataTransfer.setData(
-                        PROJECT_SPACE_DRAG_MIME,
-                        JSON.stringify({ projectId: project.id }),
-                      );
+                      beginProjectDrag(event.dataTransfer, project.id);
                     },
                   }
                 : {})}
@@ -6786,6 +6783,7 @@ export default function Sidebar() {
           id: shortcut.key,
           glyphs: railCentralGlyphs(spaceDisplayIcon(shortcut.spaceId, spaces, voidSpace)),
           label: spaceDisplayName(shortcut.spaceId, spaces, voidSpace),
+          onProjectDrop: (projectId) => void handleMoveProjectToSpace(projectId, shortcut.spaceId),
           badge: null,
           active: activeRailShortcutKey === shortcut.key,
           onSelect: () => {

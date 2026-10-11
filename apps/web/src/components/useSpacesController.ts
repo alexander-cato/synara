@@ -440,7 +440,13 @@ export function useSpacesController(input: {
     async (projectId: ProjectId, spaceId: SpaceId | null) => {
       const api = readNativeApi();
       const project = projectById.get(projectId);
-      if (!api || !project || (project.spaceId ?? null) === spaceId) return;
+      if (
+        !api ||
+        !isOrdinarySpaceProject(project, workspacePaths) ||
+        (project.spaceId ?? null) === spaceId ||
+        (spaceId !== null && !spaces.some((space) => space.id === spaceId))
+      )
+        return;
       onCloseProjectContextMenu();
       // Evaluated before the `try` (see `spaceOrderMatches`); none of these inputs can change
       // across the await anyway.
@@ -466,6 +472,8 @@ export function useSpacesController(input: {
       projectById,
       routeProjectId,
       selectSpaceForNavigation,
+      spaces,
+      workspacePaths,
     ],
   );
 
