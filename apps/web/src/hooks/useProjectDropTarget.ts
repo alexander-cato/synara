@@ -7,20 +7,24 @@ import { isProjectDrag, readDraggedProjectId } from "~/lib/projectDrag";
 export function useProjectDropTarget(onProjectDrop: ((projectId: ProjectId) => void) | undefined) {
   const dragDepth = useRef(0);
   const [isProjectOver, setIsProjectOver] = useState(false);
+  const enabled = onProjectDrop !== undefined;
 
   useEffect(() => {
-    if (!onProjectDrop) return;
     const reset = () => {
       dragDepth.current = 0;
       setIsProjectOver(false);
     };
+    if (!enabled) {
+      reset();
+      return;
+    }
     window.addEventListener("dragend", reset);
     window.addEventListener("drop", reset);
     return () => {
       window.removeEventListener("dragend", reset);
       window.removeEventListener("drop", reset);
     };
-  }, [onProjectDrop]);
+  }, [enabled]);
 
   return {
     isProjectOver,

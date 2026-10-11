@@ -37,8 +37,10 @@ composer; it is not sent twice.
   With manual project sorting, drag the row to move spaces or its reorder grip to change list order.
   In the Spaces catalog, each space section accepts drops across its header, project list,
   and empty state, so spaces do not need a pinned shortcut to receive projects.
-  Open saved threads appear as tabs across the top of the chat. Unsent drafts stay out of
-  the tab strip until they become saved threads on the first send. Saved tabs remain
+  Open saved threads appear as tabs across the top of the chat.
+  Drag a saved chat from the sidebar or Activity onto the open-chat tab strip to open and
+  select it. Dropping onto a composer inserts a chat mention; dropping onto a pane edge splits chats.
+  Unsent drafts stay out of the tab strip until they become saved threads on the first send. Saved tabs remain
   available to return to while an unsent draft is on screen, including in the editor view.
   The command palette searches titles, project metadata, and settled user/assistant messages
   across saved chats, including chats not recently opened. Archived, deleted, and subagent

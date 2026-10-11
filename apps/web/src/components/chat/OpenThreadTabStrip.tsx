@@ -27,6 +27,7 @@ import { showThreadContextMenu } from "~/lib/threadContextMenu";
 import { readNativeApi } from "~/nativeApi";
 import {
   closeOpenThreadTab,
+  canKeepOpenThreadTab,
   closeOpenThreadTabs,
   createOpenThreadTabCloseQueue,
   type OpenThreadTab,
@@ -35,6 +36,7 @@ import {
   resolveOpenThreadTabsInCloseScope,
 } from "~/openThreadTabs.logic";
 import { useOpenThreadTabsStore } from "~/openThreadTabsStore";
+import { useStore } from "~/store";
 
 import { ProviderIcon } from "../ProviderIcon";
 import { getNextVisibleSidebarThreadId } from "../Sidebar.logic";
@@ -200,6 +202,14 @@ export function OpenThreadTabStrip(props: {
       activeKey={shownThreadId}
       selectionAria="current"
       onMove={moveThreadTab}
+      canDropThread={(threadId) =>
+        threadId === null ||
+        canKeepOpenThreadTab(useStore.getState().sidebarThreadSummaryById[threadId], false)
+      }
+      onThreadDrop={(threadId) => {
+        useOpenThreadTabsStore.getState().openThreadTab(threadId);
+        if (threadId !== shownThreadId) selectTab(threadId);
+      }}
       tabs={tabs.map((tab) => {
         const active = tab.threadId === shownThreadId;
         return {

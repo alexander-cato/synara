@@ -13419,6 +13419,53 @@ describe("ChatView transcript geometry (full app)", () => {
     },
   );
 
+  it.each(["tabs", "composer"])("drops a saved sidebar thread onto the %s", async (destination) => {
+    useOpenThreadTabsStore.setState({ threadIds: [] });
+    const snapshot = addThreadToSnapshot(
+      createSnapshotForTargetUser({
+        targetMessageId: MessageId.makeUnsafe("native-thread-drop"),
+        targetText: "Drop a chat",
+      }),
+      OTHER_THREAD_ID,
+    );
+    const mounted = await mountChatView({ viewport: DEFAULT_VIEWPORT, snapshot });
+    try {
+      expect(useOpenThreadTabsStore.getState().threadIds).not.toContain(OTHER_THREAD_ID);
+      const target =
+        destination === "tabs"
+          ? page.getByRole("navigation", { name: "Open threads" })
+          : document.querySelector<HTMLElement>('[data-thread-mention-dropzone="true"]')!;
+      await userEvent.dragAndDrop(
+        page.getByRole("button", { name: "Open New thread", exact: true }),
+        target,
+      );
+      if (destination === "tabs") {
+        await expect.poll(() => mounted.router.state.location.pathname).toBe(`/${OTHER_THREAD_ID}`);
+        expect(useOpenThreadTabsStore.getState().threadIds).toEqual([THREAD_ID, OTHER_THREAD_ID]);
+        await expect
+          .element(
+            page
+              .getByRole("navigation", { name: "Open threads" })
+              .getByRole("button", { name: "New thread", exact: true }),
+          )
+          .toHaveAttribute("aria-current", "page");
+        expect(mounted.router.state.location.search.splitViewId).toBeUndefined();
+      } else {
+        await expect
+          .poll(() => useComposerDraftStore.getState().draftsByThreadId[THREAD_ID]?.mentions)
+          .toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ path: `thread://${OTHER_THREAD_ID}` }),
+            ]),
+          );
+        expect(mounted.router.state.location.pathname).toBe(`/${THREAD_ID}`);
+        expect(useOpenThreadTabsStore.getState().threadIds).not.toContain(OTHER_THREAD_ID);
+      }
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
   it("keeps close-button pointer travel from starting a horizontal tab drag", async () => {
     const snapshot = addThreadToSnapshot(
       createSnapshotForTargetUser({
