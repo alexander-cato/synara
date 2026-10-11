@@ -12,6 +12,7 @@ import { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type TerminalContextSelection } from "~/lib/terminalContext";
 import { readNativeApi } from "~/nativeApi";
+import { useLinkOpener } from "~/lib/linkContextMenu";
 import { cn } from "~/lib/utils";
 import {
   resolveTerminalSelectionActionPosition,
@@ -130,6 +131,7 @@ export default function TerminalViewport({
   isVisible,
 }: TerminalViewportProps) {
   const terminalCliKind = terminalCliKindProp ?? null;
+  const openLink = useLinkOpener();
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const onAddTerminalContextRef = useRef(onAddTerminalContext);
@@ -166,6 +168,7 @@ export default function TerminalViewport({
       ...(providerAuthInstanceId ? { providerAuthInstanceId } : {}),
       ...(runtimeEnvPayload ? { runtimeEnv: runtimeEnvPayload } : {}),
       callbacks: {
+        ...(providerAuthInstanceId ? {} : { onOpenLink: openLink }),
         onSessionExited,
         onTerminalMetadataChange,
         onTerminalActivityChange,
@@ -184,6 +187,7 @@ export default function TerminalViewport({
       providerAuthInstanceId,
       onTerminalActivityChange,
       onTerminalMetadataChange,
+      openLink,
       runtimeEnvPayload,
       runtimeKey,
       terminalCliKind,

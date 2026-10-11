@@ -379,6 +379,13 @@ export const SETTINGS_SEARCH_ENTRIES: readonly SettingsSearchEntry[] = [
 
   // ── Behavior ──────────────────────────────────────────────────────────────────
   {
+    id: "behavior:web-link-destination",
+    section: "behavior",
+    title: "Open web links",
+    keywords:
+      "default link destination in-app browser external system browser URL terminal PDF documentation",
+  },
+  {
     id: "behavior:sidechat-expiry",
     section: "behavior",
     title: "Side chat expiry",

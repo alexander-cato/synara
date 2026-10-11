@@ -323,7 +323,7 @@ import { useProviderStatusesForLocalConfig } from "../hooks/useProviderStatusesF
 import { useThreadHandoff } from "../hooks/useThreadHandoff";
 import { useCreateProjectDialogStore } from "../createProjectDialogStore";
 import { useFeedbackDialogStore } from "../feedbackDialogStore";
-import { openExternalLink } from "~/lib/linkChips";
+import { useLinkOpener } from "~/lib/linkContextMenu";
 import { selectThreadTerminalState, useTerminalStateStore } from "../terminalStateStore";
 import { toastManager } from "./ui/toast";
 import {
@@ -940,6 +940,7 @@ function SidebarHelpMenu({
   /** Rail layout: the trigger takes the rail button look and the menu opens to the side. */
   inRail?: boolean;
 }) {
+  const openLink = useLinkOpener();
   const inRail = inRailProp ?? false;
   // `openCount` keys the dialog so each open remounts the accordion — its rows
   // capture `defaultOpen` in mount state, so a stale mount would ignore a
@@ -1022,7 +1023,7 @@ function SidebarHelpMenu({
             </MenuItem>
             <MenuItem
               className={SIDEBAR_CONTEXT_MENU_ITEM_CLASS_NAME}
-              onClick={() => openExternalLink(SYNARA_DOCS_URL)}
+              onClick={(event) => openLink(SYNARA_DOCS_URL, event)}
             >
               <SidebarContextMenuIcon icon={BookIcon} />
               <span>Docs</span>

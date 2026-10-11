@@ -27,6 +27,7 @@ import {
   type AppSettings,
   type FollowUpBehavior,
   type GitHubLinkOpenTarget,
+  type WebLinkOpenTarget,
   type MessageTrailAudioSource,
   type VoiceEnterBehavior,
   DEFAULT_UI_DENSITY,
@@ -217,6 +218,11 @@ const GITHUB_LINK_OPEN_TARGET_LABELS = {
   browser: "In-app browser",
   external: "External browser",
 } as const satisfies Record<GitHubLinkOpenTarget, string>;
+
+const WEB_LINK_OPEN_TARGET_LABELS = {
+  browser: "In-app browser",
+  external: "External browser",
+} as const satisfies Record<WebLinkOpenTarget, string>;
 
 const MESSAGE_TRAIL_AUDIO_SOURCE_OPTIONS = [
   { value: "off", label: "Off" },
@@ -558,6 +564,7 @@ function SettingsRouteView() {
     ...(settings.githubLinkOpenTarget !== defaults.githubLinkOpenTarget
       ? ["Open pull requests and issues"]
       : []),
+    ...(settings.webLinkOpenTarget !== defaults.webLinkOpenTarget ? ["Open web links"] : []),
     ...(settings.showPullRequestDiffColors !== defaults.showPullRequestDiffColors
       ? ["Pull request diff colors"]
       : []),
@@ -1383,6 +1390,39 @@ function SettingsRouteView() {
 
   const renderBehaviorPanel = () => (
     <div className="space-y-6">
+      <SettingsSection title="Links">
+        <SettingsRow
+          title="Open web links"
+          description="Choose where web links open. The in-app browser uses the current task; links open externally when it is unavailable. Ctrl/Cmd+click opens externally. Terminal links use their usual Ctrl/Cmd+click and follow this setting. Pull requests and issues have a separate preference below."
+          resetAction={
+            settings.webLinkOpenTarget !== defaults.webLinkOpenTarget ? (
+              <SettingResetButton
+                label="open web links"
+                onClick={() => updateSettings({ webLinkOpenTarget: defaults.webLinkOpenTarget })}
+              />
+            ) : null
+          }
+          control={
+            <SettingsSelectControl
+              value={settings.webLinkOpenTarget}
+              onValueChange={(value) => {
+                if (value === "browser" || value === "external")
+                  updateSettings({ webLinkOpenTarget: value });
+              }}
+              ariaLabel="Open web links"
+              triggerClassName="w-full sm:w-40"
+              valueContent={WEB_LINK_OPEN_TARGET_LABELS[settings.webLinkOpenTarget]}
+            >
+              <SelectItem hideIndicator value="browser">
+                {WEB_LINK_OPEN_TARGET_LABELS.browser}
+              </SelectItem>
+              <SelectItem hideIndicator value="external">
+                {WEB_LINK_OPEN_TARGET_LABELS.external}
+              </SelectItem>
+            </SettingsSelectControl>
+          }
+        />
+      </SettingsSection>
       <SettingsSection title="Conversation">
         <SettingsRow
           title="Follow-up behavior"

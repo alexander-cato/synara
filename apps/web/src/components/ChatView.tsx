@@ -41,6 +41,7 @@ import {
   Suspense,
   lazy,
   useCallback,
+  useContext,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -86,10 +87,13 @@ import { readNativeApi } from "~/nativeApi";
 import { dispatchThreadSnoozedUntil, resolveSnoozeDeadline } from "~/lib/threadSnooze";
 import {
   ChatLinkActionsContext,
+  resolveLinkClickOpener,
   parseGitHubItemUrl,
   type ChatLinkActions,
 } from "~/lib/linkContextMenu";
 import { openExternalLink } from "~/lib/linkChips";
+import { LinkActionsProvider } from "./LinkActionsProvider";
+import { openLinkInBrowserPanel } from "~/lib/openBrowserLink";
 import {
   mergeProjectInstructionsIntoThreadNotes,
   useProjectInstructionsStore,
@@ -2742,27 +2746,20 @@ export default function ChatView({
   }, [browserOpen, navigate, onToggleBrowserPanel, threadId]);
   const openBrowserUrl = useCallback(
     (url: string) => {
-      const api = readNativeApi();
-      void api?.browser.open({ threadId, initialUrl: url }).catch((error) => {
-        toastManager.add({
-          type: "error",
-          title: "Could not open repository",
-          description:
-            error instanceof Error ? error.message : "The in-app browser could not open GitHub.",
+      openLinkInBrowserPanel(url, threadId, () => {
+        if (onOpenBrowserUrl) {
+          onOpenBrowserUrl(url);
+          return;
+        }
+        void navigate({
+          to: "/$threadId",
+          params: { threadId },
+          replace: true,
+          search: (previous) => ({
+            ...stripDiffSearchParams(previous),
+            panel: "browser",
+          }),
         });
-      });
-      if (onOpenBrowserUrl) {
-        onOpenBrowserUrl(url);
-        return;
-      }
-      void navigate({
-        to: "/$threadId",
-        params: { threadId },
-        replace: true,
-        search: (previous) => ({
-          ...stripDiffSearchParams(previous),
-          panel: "browser",
-        }),
       });
     },
     [navigate, onOpenBrowserUrl, threadId],
@@ -2774,11 +2771,14 @@ export default function ChatView({
   const openRightDockPane = useRightDockStore((store) => store.openPane);
   // A side chat in a dock (the only chat without a header) has no dock or browser panel of its
   // own on screen, so the fallbacks above change for it. A forked one selects a PR tab in its host
-  // chat's dock, a standalone one (Code review's Ask) selects the PR in Code review, and links
-  // meant for the in-app browser open externally.
+  // chat's dock, a standalone one (Code review's Ask) selects the PR in Code review. Browser
+  // links use the containing surface's browser when one is available.
   const sidechatHostThreadId = hideHeader ? (activeThread?.sidechatSourceThreadId ?? null) : null;
   const opensPullRequestInCodeReview = hideHeader && standaloneSidechatContext !== null;
-  const openLinkInBrowser = hideHeader ? openExternalLink : openBrowserUrl;
+  const inheritedLinkActions = useContext(ChatLinkActionsContext);
+  const openLinkInBrowser = hideHeader
+    ? (inheritedLinkActions?.openInBrowserPanel ?? openExternalLink)
+    : openBrowserUrl;
   const openGitHubItemLink = (url: string) => {
     const item = parseGitHubItemUrl(url);
     if (!item || !activeProjectId) {
@@ -2822,6 +2822,9 @@ export default function ChatView({
     openInBrowserPanel: openLinkInBrowser,
     openGitHubItem: openGitHubItemLink,
     githubLinkOpenTarget: settings.githubLinkOpenTarget,
+    webLinkOpenTarget: settings.webLinkOpenTarget,
+    browserAvailable:
+      isElectron && (!hideHeader || inheritedLinkActions?.browserAvailable === true),
   };
 
   const envLocked = Boolean(
@@ -5808,7 +5811,10 @@ export default function ChatView({
     onCopyProjectInstructionsToNotes: handleCopyProjectInstructionsToNotes,
     onToggleDiff,
     onOpenAutomation: (definition: AutomationDefinition) => onOpenAutomation(definition.id),
-    onOpenGithubRepository: openBrowserUrl,
+    onOpenGithubRepository: (url) => {
+      const opener = resolveLinkClickOpener(url, chatLinkActions) ?? openExternalLink;
+      opener(url);
+    },
     onJumpToPinnedMessage: handleJumpToPinnedMessage,
     onTogglePinnedMessageDone: handleTogglePinnedMessageDone,
     onUnpinMessage: handleUnpinMessage,
@@ -7116,9 +7122,5 @@ export default function ChatView({
       />
     </div>
   );
-  return (
-    <ChatLinkActionsContext.Provider value={chatLinkActions}>
-      {chatView}
-    </ChatLinkActionsContext.Provider>
-  );
+  return <LinkActionsProvider actions={chatLinkActions}>{chatView}</LinkActionsProvider>;
 }

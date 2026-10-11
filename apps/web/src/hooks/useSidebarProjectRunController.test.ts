@@ -4,6 +4,7 @@
 
 import { ProjectId } from "@synara/contracts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChatLinkActions } from "~/lib/linkContextMenu";
 
 const reactHarness = vi.hoisted(() => {
   interface HookSlot {
@@ -76,6 +77,7 @@ const reactHarness = vi.hoisted(() => {
 });
 
 const harness = vi.hoisted(() => ({
+  linkActions: null as ChatLinkActions | null,
   runsByProjectId: {} as Record<string, unknown>,
   upsertRun: vi.fn(),
   removeRun: vi.fn(),
@@ -91,7 +93,9 @@ const harness = vi.hoisted(() => ({
   discoveredTargetsByQuery: [[]] as unknown[][],
 }));
 
-vi.mock("react", () => ({
+vi.mock("react", async (original) => ({
+  ...(await original<typeof import("react")>()),
+  useContext: () => harness.linkActions,
   useCallback: reactHarness.useCallback,
   useEffect: reactHarness.useEffect,
   useMemo: reactHarness.useMemo,
@@ -192,6 +196,7 @@ function confirmRun(command: string) {
 }
 
 beforeEach(() => {
+  harness.linkActions = null;
   reactHarness.reset();
   harness.runsByProjectId = {};
   harness.localServers = [];
@@ -388,6 +393,27 @@ describe("useSidebarProjectRunController", () => {
     expect(harness.toast).toHaveBeenCalledWith(
       expect.objectContaining({ type: "error", description: "shell unavailable" }),
     );
+  });
+
+  it("opens a project server in the current task browser when configured", async () => {
+    const browser = vi.fn();
+    harness.linkActions = { openInBrowserPanel: browser };
+    harness.localServers = [
+      {
+        id: "server-root",
+        pid: 900,
+        ppid: 1,
+        cwd: "/repo",
+        ports: [4173],
+        addresses: [{ host: "127.0.0.1", port: 4173, url: "http://localhost:4173" }],
+      },
+    ];
+    await render().handleOpenProjectRunServer(PROJECT_ID);
+    expect(browser).toHaveBeenCalledWith("http://localhost:4173");
+    expect(harness.openExternal).not.toHaveBeenCalled();
+    harness.linkActions = { openInBrowserPanel: browser, webLinkOpenTarget: "external" };
+    await render().handleOpenProjectRunServer(PROJECT_ID);
+    expect(harness.openExternal).toHaveBeenCalledWith("http://localhost:4173");
   });
 
   it("seeds and trims dialog commands while persistence failure does not block launch", async () => {

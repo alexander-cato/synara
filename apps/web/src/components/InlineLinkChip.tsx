@@ -6,12 +6,8 @@
 
 import { type MouseEvent, useContext } from "react";
 
-import { describeLinkChip, openExternalLink } from "~/lib/linkChips";
-import {
-  ChatLinkActionsContext,
-  resolveGitHubItemClickOpener,
-  showLinkContextMenu,
-} from "~/lib/linkContextMenu";
+import { describeLinkChip } from "~/lib/linkChips";
+import { ChatLinkActionsContext, showLinkContextMenu, useLinkOpener } from "~/lib/linkContextMenu";
 import {
   COMPOSER_INLINE_CHIP_INLINE_ICON_CLASS_NAME,
   COMPOSER_INLINE_LINK_CHIP_CLASS_NAME,
@@ -36,19 +32,12 @@ export function InlineLinkChip({
   const { label } = describeLinkChip(url);
   const chipClassName = className ?? COMPOSER_INLINE_LINK_CHIP_CLASS_NAME;
   const linkActions = useContext(ChatLinkActionsContext);
+  const openLink = useLinkOpener();
 
   const onClick = (event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    // A plain click on a pull request or issue follows the user's setting (in the app by
-    // default); cmd/ctrl-click goes to GitHub.
-    const openGitHubItem =
-      event.metaKey || event.ctrlKey ? undefined : resolveGitHubItemClickOpener(url, linkActions);
-    if (openGitHubItem) {
-      openGitHubItem(url);
-      return;
-    }
-    openExternalLink(url);
+    openLink(url, event);
   };
 
   const onContextMenu = (event: MouseEvent) => {
@@ -90,6 +79,7 @@ export function InlineLinkChip({
       suppressContentEditableWarning
       spellCheck={false}
       onClick={onClick}
+      onContextMenu={onContextMenu}
       role="link"
     >
       {content}

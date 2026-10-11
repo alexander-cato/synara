@@ -982,6 +982,10 @@ export function createRuntimeEntry(config: TerminalRuntimeConfig): TerminalRunti
               if (!api) return;
 
               if (match.kind === "url") {
+                if (entry.callbacks.onOpenLink) {
+                  entry.callbacks.onOpenLink(match.text);
+                  return;
+                }
                 void api.shell.openExternal(match.text).catch((error) => {
                   writeSystemMessage(terminal, describeErrorMessage(error, "Unable to open link"));
                 });

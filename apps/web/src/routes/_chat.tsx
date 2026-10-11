@@ -11,6 +11,7 @@ import {
 } from "../appNavigation";
 import { AppRailSlotProvider } from "../components/AppRail";
 import { AppShellTopStrip } from "../components/AppShellTopStrip";
+import { AppLinkActionsProvider } from "../components/LinkActionsProvider";
 import { SidebarLeadingControlsDock } from "../components/SidebarHeaderNavigationControls";
 import { resolveSelectableProviderInstanceId, useAppSettings } from "../appSettings";
 import ShortcutsDialog from "../components/ShortcutsDialog";
@@ -628,38 +629,40 @@ function ChatRouteLayout() {
   // the existing <Sidebar> offcanvas slide and resize run unchanged below the strip and are
   // clipped at the rail. The strip height reaches CSS as a variable (see index.css).
   return (
-    <SidebarProvider
-      defaultOpen
-      open={resolvedSidebarOpen}
-      onOpenChange={handleSidebarOpenChange}
-      className="h-svh overflow-hidden bg-[var(--app-rail-shell-background)]"
-      style={{ "--app-top-strip-height": `${CHAT_SURFACE_HEADER_HEIGHT_PX}px` } as CSSProperties}
-      data-sidebar-side="left"
-      data-sidebar-layout="rail"
-    >
-      <ThreadRetentionMaintenanceToast />
-      <ChatRouteGlobalShortcuts />
-      <AppRailSlotProvider value={railSlot}>
-        <SidebarLeadingControlsDock routeColumn={routeColumn} railSlot={railSlot}>
-          {isMobile ? (
-            // Phones show the sidebar as a sheet that carries its own rail (see ThreadSidebar),
-            // so the shell keeps no left column.
-            sidebarElement
-          ) : (
-            <div className="flex min-h-0 shrink-0 flex-col">
-              <AppShellTopStrip />
-              <div className="flex min-h-0 flex-1">
-                <div ref={setRailSlot} className="flex shrink-0" />
-                <div className="app-rail-panel relative flex shrink-0 overflow-hidden [contain:paint]">
-                  {sidebarElement}
+    <AppLinkActionsProvider>
+      <SidebarProvider
+        defaultOpen
+        open={resolvedSidebarOpen}
+        onOpenChange={handleSidebarOpenChange}
+        className="h-svh overflow-hidden bg-[var(--app-rail-shell-background)]"
+        style={{ "--app-top-strip-height": `${CHAT_SURFACE_HEADER_HEIGHT_PX}px` } as CSSProperties}
+        data-sidebar-side="left"
+        data-sidebar-layout="rail"
+      >
+        <ThreadRetentionMaintenanceToast />
+        <ChatRouteGlobalShortcuts />
+        <AppRailSlotProvider value={railSlot}>
+          <SidebarLeadingControlsDock routeColumn={routeColumn} railSlot={railSlot}>
+            {isMobile ? (
+              // Phones show the sidebar as a sheet that carries its own rail (see ThreadSidebar),
+              // so the shell keeps no left column.
+              sidebarElement
+            ) : (
+              <div className="flex min-h-0 shrink-0 flex-col">
+                <AppShellTopStrip />
+                <div className="flex min-h-0 flex-1">
+                  <div ref={setRailSlot} className="flex shrink-0" />
+                  <div className="app-rail-panel relative flex shrink-0 overflow-hidden [contain:paint]">
+                    {sidebarElement}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          {mainContentShell}
-        </SidebarLeadingControlsDock>
-      </AppRailSlotProvider>
-    </SidebarProvider>
+            )}
+            {mainContentShell}
+          </SidebarLeadingControlsDock>
+        </AppRailSlotProvider>
+      </SidebarProvider>
+    </AppLinkActionsProvider>
   );
 }
 

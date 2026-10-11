@@ -55,11 +55,7 @@ import { CentralIcon } from "~/lib/central-icons";
 import { isLocalImageMarkdownSrc } from "../lib/localImageUrls";
 import { repairMarkdownTableDelimiters } from "../lib/markdownTableRepair";
 import { showFileReferenceContextMenu } from "../lib/fileReferenceContextMenu";
-import {
-  ChatLinkActionsContext,
-  resolveGitHubItemClickOpener,
-  showLinkContextMenu,
-} from "../lib/linkContextMenu";
+import { ChatLinkActionsContext, useLinkOpener, showLinkContextMenu } from "../lib/linkContextMenu";
 import { useTheme } from "../hooks/useTheme";
 import { useSmoothStreamedText } from "../hooks/useSmoothStreamedText";
 import { useThrottledStreamingValue } from "../hooks/useThrottledStreamingValue";
@@ -1236,6 +1232,7 @@ const MARKDOWN_COMPONENTS: Components = {
       </MarkdownRenderContext.Provider>
     );
     const linkActions = useContext(ChatLinkActionsContext);
+    const openLink = useLinkOpener();
     const restoredHref = href ? restoreLiteralDollarPlaceholders(href) : href;
     const threadHref = restoredHref?.startsWith("thread://")
       ? restoredHref.slice("thread://".length)
@@ -1285,14 +1282,9 @@ const MARKDOWN_COMPONENTS: Components = {
           className={isExternalHttp ? MARKDOWN_EXTERNAL_LINK_CLASS_NAME : props.className}
           {...(isExternalHttp
             ? {
-                // A plain click on a pull request or issue follows the user's setting (in
-                // the app by default); cmd/ctrl-click keeps the default external open.
                 onClick: (event: React.MouseEvent) => {
-                  if (event.metaKey || event.ctrlKey) return;
-                  const openGitHubItem = resolveGitHubItemClickOpener(restoredHref, linkActions);
-                  if (!openGitHubItem) return;
                   event.preventDefault();
-                  openGitHubItem(restoredHref);
+                  openLink(restoredHref, event);
                 },
                 onContextMenu: (event: React.MouseEvent) => {
                   event.preventDefault();

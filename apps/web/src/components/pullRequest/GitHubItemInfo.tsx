@@ -24,6 +24,7 @@ import {
 } from "~/lib/icons";
 import { cn } from "~/lib/utils";
 import { ensureNativeApi } from "~/nativeApi";
+import { useLinkOpener } from "~/lib/linkContextMenu";
 import { withStableCheckKeys } from "~/components/chat/environment/environmentPullRequest.logic";
 import { GitHubLabelChips } from "./GitHubLabelChips";
 import { PullRequestActorLabel } from "./PullRequestActorLabel";
@@ -186,6 +187,7 @@ function ReviewsSection({ variant, detail }: { variant: InfoVariant; detail: Pul
 }
 
 function CheckRows({ checks }: { checks: PullRequestDetail["checks"] }) {
+  const openLink = useLinkOpener();
   const [showAll, setShowAll] = useState(false);
   const rows = withStableCheckKeys(checks);
   const visible = showAll ? rows : rows.slice(0, CHECKS_VISIBLE_LIMIT);
@@ -196,7 +198,7 @@ function CheckRows({ checks }: { checks: PullRequestDetail["checks"] }) {
           key={key}
           type="button"
           disabled={!check.url}
-          onClick={() => check.url && void ensureNativeApi().shell.openExternal(check.url)}
+          onClick={(event) => check.url && openLink(check.url, event)}
           className="-mx-1.5 flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-muted/50 disabled:hover:bg-transparent"
         >
           <PullRequestCheckStatusIcon status={check.status} />

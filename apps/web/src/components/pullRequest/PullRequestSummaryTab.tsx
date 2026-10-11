@@ -20,7 +20,7 @@ import {
 import { ChatBubbleIcon, GitBranchIcon, UsersIcon } from "~/lib/icons";
 import { pullRequestCommentMutationOptions } from "~/lib/pullRequestReactQuery";
 import { formatRelativeTime } from "~/lib/relativeTime";
-import { ensureNativeApi } from "~/nativeApi";
+import { useLinkOpener } from "~/lib/linkContextMenu";
 import { describePullRequestState } from "./pullRequestDetail.logic";
 import { PullRequestActorLabel } from "./PullRequestActorLabel";
 import { PullRequestCheckStatusIcon } from "./PullRequestCheckStatusIcon";
@@ -175,6 +175,7 @@ export function PullRequestSummaryTab({
   showHeading?: boolean;
 }) {
   const showHeading = showHeadingProp ?? true;
+  const openLink = useLinkOpener();
   return (
     <div className="h-full overflow-y-auto">
       <section className={cn("space-y-4 px-5", showHeading ? "py-5" : "py-3")}>
@@ -267,7 +268,7 @@ export function PullRequestSummaryTab({
                 key={key}
                 type="button"
                 disabled={!check.url}
-                onClick={() => check.url && void ensureNativeApi().shell.openExternal(check.url)}
+                onClick={(event) => check.url && openLink(check.url, event)}
                 className={cn(
                   PR_META_TEXT_CLASS_NAME,
                   // The row bleeds past the panel padding and pays the same amount back as

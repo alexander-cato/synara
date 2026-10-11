@@ -2808,18 +2808,19 @@ describe("ChatView transcript geometry (full app)", () => {
         });
         await link.click({ button: "right" });
         await expect
-          .element(page.getByRole("button", { name: "Open pull request", exact: true }))
-          .toBeVisible();
-        await expect
-          .element(page.getByRole("button", { name: "Open in browser", exact: true }))
-          .toBeVisible();
-        await expect
-          .element(page.getByRole("button", { name: "Open in external browser", exact: true }))
+          .element(page.getByRole("button", { name: "Open link", exact: true }))
           .toBeVisible();
         await expect
           .element(page.getByRole("button", { name: "Copy link", exact: true }))
           .toBeVisible();
-        await page.getByRole("button", { name: "Open pull request", exact: true }).click();
+        await page.getByRole("button", { name: "Open link", exact: true }).hover();
+        await expect
+          .element(page.getByRole("button", { name: "Pull request in Synara", exact: true }))
+          .toBeVisible();
+        await expect
+          .element(page.getByRole("button", { name: "External browser", exact: true }))
+          .toBeVisible();
+        await page.getByRole("button", { name: "Pull request in Synara", exact: true }).click();
         await vi.waitFor(() => {
           expect(useRightDockStore.getState().dockStateByThreadId[THREAD_ID]?.panes).toEqual(
             expect.arrayContaining([
