@@ -10,7 +10,7 @@ import {
 } from "./cuaDriverProtocol";
 
 /**
- * The macOS cua-driver tool inventory at the pinned release (driver 0.28.2,
+ * The macOS cua-driver tool inventory at the pinned release (driver 0.34.1,
  * Synara native patch, embedded serve). `platform-macos` `tools::register_all`
  * registers the platform and core tools; the cua-driver binary adds
  * `check_for_update` and — only under the upstream preview admission the
@@ -76,6 +76,7 @@ const REGISTERED_MACOS_TOOLS = [
   // Host-internal cursor ownership; posture is set at spawn and bootstrap.
   "set_agent_cursor_enabled",
   "set_agent_cursor_motion",
+  "set_agent_cursor_style",
   "set_agent_cursor_theme",
   // Host-internal driver configuration.
   "get_config",
@@ -171,6 +172,7 @@ describe("cuaDriverProtocol tool boundary", () => {
         "get_session_state",
         "set_agent_cursor_enabled",
         "set_agent_cursor_motion",
+        "set_agent_cursor_style",
         "set_agent_cursor_theme",
         "get_config",
         "set_config",

@@ -688,5 +688,51 @@ not qualified by these checks.
 The native patch builds `cua-driver-sdk` as an `rlib` only. The driver still uses
 the SDK internally; Synara does not ship or load its separate `cdylib` on macOS
 or patched Linux. Removing that output avoids its code generation/link step
-without removing SDK functionality or changing native protocol revision 39.
+while preserving SDK functionality and its wire protocol.
 The patch checksum and trusted build-cache key cover this build-only change.
+
+## Revision 40: Cua 0.34.1 rebase
+
+The base is upstream `0c69d9a2c8abbb5051a2df4a23f0fa166d5385dc`, released as
+`cua-driver-rs-v0.34.1`. The release manifest pins the upstream macOS universal
+archive checksum, both patch checksums and Rust 1.97.1. The two patches now
+contain one cumulative diff each against that base. Apply the native patch first,
+then the Linux browser patch on Linux.
+
+Native action arguments use opaque `element_token` references. The upstream
+registry rejects `element_index`, `snapshot_id` and other unknown action arguments.
+Synara's backend and background fixture therefore send only the exact token.
+A new snapshot for a window replaces its tokens; resolving a token retains its
+AX element for the admitted action. Screenshot-only reads do not publish a tree.
+
+The rebase keeps upstream's Finder rename refusal, menu matching and cleanup,
+launch readiness, key modifier flags, HID drag fields, cursor motion and strict
+browser-helper signing. Synara retains exact-window admission, semantic text,
+modal checks, release guards, cancellation acknowledgements, headless browser
+launches and the compact cursor. Keyboard and mouse release events are prepared
+before their downs, including upstream's foreground drag route. No off-screen
+click primer or background activation is added. Background native drag still
+refuses before dispatch.
+
+Live fixtures found that a modifier used as the base key needs its own down
+flag, and that foreground HID clicks need the admitted window's routing fields.
+Revision 40 fixes both. Stop during a held double-click, typing, drag and
+Shift-click now produces the matching releases in the owned renderer; the
+double-click sends no second down after Stop.
+
+AX attribute prefetch now shares the upstream node and time budgets. The walk
+clock starts before the first attribute batch, worker count and batch size stay
+bounded, and expired workers stop requesting optional AX data. Post-action
+observation reports `polled:false` when skipped or failed, rather than claiming
+that it observed no change.
+
+A launched isolated browser gets a cleanup owner before endpoint discovery's
+first await. Cancellation or a dropped setup future removes only that owned
+process group and marked profile. This shared fix is in the base patch, so
+macOS and Linux both receive it. The Linux delta retains browser-only input
+admission and cleanup acknowledgements without enabling native desktop input.
+
+The provisioner archives the pinned telemetry dependency and embedded JSON files
+alongside `libs/cua-driver`; upstream now reads those sibling paths during a build.
+Qualification belongs to the exact build and platform recorded in
+[the revision 40 report](../../../../docs/computer-use-cua/upgrade-0.34.1-2026-10-10.md).

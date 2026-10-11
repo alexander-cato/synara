@@ -229,11 +229,8 @@ function exactField(snapshot, label = primaryLabel) {
     ) ?? [];
   assert.equal(matches.length, 1, "One exact owned input must be discoverable.");
   const field = matches[0];
-  return {
-    element_index: field.element_index,
-    ...(field.element_token ? { element_token: field.element_token } : {}),
-    ...(snapshot.snapshot_id ? { snapshot_id: snapshot.snapshot_id } : {}),
-  };
+  assert.equal(typeof field.element_token, "string", "An exact opaque field token is required.");
+  return { element_token: field.element_token };
 }
 try {
   report.driverSha256 = createHash("sha256")
@@ -431,6 +428,37 @@ try {
       y: fixtureState.contentBounds.y - bounds.y + rect.y,
     };
   }
+  await runCase("background-click-with-independent-foreground-keys", async () => {
+    state = await snapshot();
+    const before = (await targetCommand("state")).states;
+    const rect = before.A.inputRect;
+    if (ownedSentinel) sentinel.stdin.write("user-keys-a\n");
+    await call("click", {
+      ...a,
+      ...coordinates(before.A, { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }),
+      force_synthetic: true,
+      delivery_mode: "background",
+    });
+    await delay(300);
+    const after = (await targetCommand("state")).states;
+    assert.equal(
+      after.A.clicks,
+      before.A.clicks + 1,
+      "Exactly one owned renderer click is required.",
+    );
+    assert.deepEqual(after.B, before.B, "Sibling renderer must remain untouched.");
+    if (ownedSentinel) {
+      const observed = sentinel.lines.findLast((row) => row.event === "state" && row.label === "A");
+      assert.equal(observed?.keyDowns, 10, "All independent foreground key downs must arrive.");
+      assert.equal(observed?.keyUps, 10, "All independent foreground key ups must arrive.");
+      assert.equal(observed?.text, "hhhhhhhhhh", "Independent foreground text must stay intact.");
+      report.simulatedForegroundInput = {
+        keyDowns: observed.keyDowns,
+        keyUps: observed.keyUps,
+        text: observed.text,
+      };
+    }
+  });
   if (!options.includes("--enter-only")) {
     await runCase("nested-scroll-has-independent-positive-delta", async () => {
       const before = (await targetCommand("state")).states;

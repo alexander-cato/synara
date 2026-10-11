@@ -60,7 +60,7 @@ app
             for (const [label, window] of windows)
               states[label] = {
                 ...(await window.webContents.executeJavaScript(
-                  '({ ...fixture, value: document.querySelector("#query").value, documentScroll: window.scrollY, nestedScroll: document.querySelector("#nested").scrollTop, active: document.activeElement.id, nestedRect: document.querySelector("#nested").getBoundingClientRect().toJSON() })',
+                  '({ ...fixture, value: document.querySelector("#query").value, documentScroll: window.scrollY, nestedScroll: document.querySelector("#nested").scrollTop, active: document.activeElement.id, inputRect: document.querySelector("#query").getBoundingClientRect().toJSON(), nestedRect: document.querySelector("#nested").getBoundingClientRect().toJSON() })',
                 )),
                 visible: window.isVisible(),
                 focused: window.isFocused(),

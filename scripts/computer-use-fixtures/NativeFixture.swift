@@ -15,6 +15,49 @@ final class Controls: NSObject, NSTextFieldDelegate {
   var clicks = 0
   var edits = 0
   var mouseEvents: [[String: Any]] = []
+  var sheet: NSWindow?
+  var modalClicks = 0
+  var keyDowns = 0
+  var keyUps = 0
+
+  func simulateUserKeys(_ remaining: Int = 10) {
+    guard remaining > 0, window.isKeyWindow,
+      NSWorkspace.shared.frontmostApplication?.processIdentifier == ProcessInfo.processInfo.processIdentifier else {
+      report()
+      return
+    }
+    for type in [NSEvent.EventType.keyDown, .keyUp] {
+      if let event = NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [],
+        timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+        context: nil, characters: "h", charactersIgnoringModifiers: "h", isARepeat: false, keyCode: 4) {
+        NSApplication.shared.sendEvent(event)
+      }
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { self.simulateUserKeys(remaining - 1) }
+  }
+
+  func showSheet() {
+    guard sheet == nil else { return }
+    let modal = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 150),
+      styleMask: [.titled], backing: .buffered, defer: false)
+    modal.title = "Synara Native Modal Fixture \(ProcessInfo.processInfo.processIdentifier)"
+    modal.isReleasedWhenClosed = false
+    let accept = NSButton(title: "Modal accept", target: self, action: #selector(acceptedSheet))
+    accept.frame = NSRect(x: 30, y: 50, width: 180, height: 40)
+    modal.contentView?.addSubview(accept)
+    sheet = modal
+    window.beginSheet(modal)
+    report()
+  }
+
+  @objc func acceptedSheet() { modalClicks += 1; report() }
+  func closeSheet() {
+    guard let modal = sheet else { return }
+    window.endSheet(modal)
+    modal.orderOut(nil)
+    sheet = nil
+    report()
+  }
 
   init(label: String, offset: Int) {
     self.label = label
@@ -46,15 +89,20 @@ final class Controls: NSObject, NSTextFieldDelegate {
       "windowId": window.windowNumber, "title": window.title, "clicks": clicks,
       "edits": edits, "text": text.stringValue, "key": window.isKeyWindow,
       "visible": window.isVisible, "minimized": window.isMiniaturized,
-      "mouseEvents": mouseEvents])
+      "mouseEvents": mouseEvents, "modalWindowId": sheet?.windowNumber ?? 0,
+      "modalClicks": modalClicks, "keyDowns": keyDowns, "keyUps": keyUps])
   }
 }
 
 let app = NSApplication.shared
 app.setActivationPolicy(.regular)
 let fixtures = [Controls(label: "A", offset: 0), Controls(label: "B", offset: 620)]
-let mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { event in
+let inputMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp, .keyDown, .keyUp]) { event in
   if let fixture = fixtures.first(where: { $0.window.windowNumber == event.windowNumber }) {
+    if event.type == .keyDown || event.type == .keyUp {
+      if event.type == .keyDown { fixture.keyDowns += 1 } else { fixture.keyUps += 1 }
+      return event
+    }
     let point = event.locationInWindow
     fixture.mouseEvents.append(["type": event.type == .leftMouseDown ? "down" : "up",
       "x": point.x, "y": point.y, "windowId": event.windowNumber,
@@ -82,9 +130,19 @@ DispatchQueue.global().async {
         fixtures[0].window.makeFirstResponder(fixtures[0].text)
         fixtures[0].text.selectText(nil)
         fixtures[0].report()
+      case "focus-b":
+        app.activate(ignoringOtherApps: true)
+        fixtures[1].window.makeKeyAndOrderFront(nil)
+        fixtures[1].window.makeFirstResponder(fixtures[1].text)
+        fixtures[1].text.selectText(nil)
+        fixtures[1].report()
       case "move-a": fixtures[0].window.setFrameOrigin(NSPoint(x: 160, y: 240))
       case "minimize-a": fixtures[0].window.miniaturize(nil)
       case "restore-a": fixtures[0].window.deminiaturize(nil)
+      case "sheet-a": fixtures[0].showSheet()
+      case "close-sheet-a": fixtures[0].closeSheet()
+      case "user-keys-a": fixtures[0].simulateUserKeys()
+      case "user-keys-b": fixtures[1].simulateUserKeys()
       case "close-a": fixtures[0].window.close()
       case "close-b": fixtures[1].window.close()
       case "quit": app.terminate(nil)

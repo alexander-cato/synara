@@ -39,7 +39,9 @@ const exportedPaths = [
   "scripts/lib/build-timing.ts",
   "docs/computer-use-cua/CUA-LICENSE.txt",
 ];
-const currentRelease = JSON.parse(readFileSync(join(root, releasePath), "utf8"));
+const currentRelease = JSON.parse(
+  execFileSync("git", ["show", `${candidate}:${releasePath}`], { encoding: "utf8" }),
+);
 const results: Array<{
   name: string;
   commit: string;
@@ -120,10 +122,20 @@ const snapshots = (
   assert.equal(source.split(marker).length, 2, "Expected one Cargo release invocation.");
   writeFileSync(script, source.replace(marker, `${marker}\n          "--timings",`));
   console.log(`[cua-benchmark] prepared ${name}: ${commit}; license and patch verified`);
-  return { name, commit, directory, target, cargoHome, script };
+  return {
+    name,
+    commit,
+    directory,
+    target,
+    cargoHome,
+    script,
+    releaseFile: join(checkout, releasePath),
+  };
 });
 
-for (const { name, commit, directory, target, cargoHome, script } of prepareOnly ? [] : snapshots) {
+for (const { name, commit, directory, target, cargoHome, script, releaseFile } of prepareOnly
+  ? []
+  : snapshots) {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     CARGO_HOME: cargoHome,
@@ -162,7 +174,7 @@ for (const { name, commit, directory, target, cargoHome, script } of prepareOnly
   writeFileSync(join(evidence, `${name}-linkage.txt`), linkage);
   assert(!linkage.includes("libcua_driver_sdk"), "Driver unexpectedly requires the SDK dylib.");
   const probe = spawnSync(process.execPath, [probePath, driver], {
-    env,
+    env: { ...env, SYNARA_CUA_PROBE_RELEASE: releaseFile },
     encoding: "utf8",
     timeout: 60_000,
   });

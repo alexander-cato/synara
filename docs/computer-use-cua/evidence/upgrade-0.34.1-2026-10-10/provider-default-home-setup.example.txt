@@ -1,0 +1,9 @@
+import {vi} from "vitest";
+const defaults=vi.hoisted(()=>({inheritedProviderHome:process.env.CODEX_HOME,sourceHome:"$EMPTY_TEST_PROVIDER_HOME"}));
+vi.mock("$REPOSITORY/apps/server/src/codexHomePaths.ts",async importOriginal=>{
+ const original=await importOriginal();
+ return {...original,resolveBaseCodexHomePath(env,explicitHomePath){
+  const isolated=explicitHomePath===undefined && env.CODEX_HOME===defaults.inheritedProviderHome;
+  return original.resolveBaseCodexHomePath(env,isolated?defaults.sourceHome:explicitHomePath);
+ }};
+});

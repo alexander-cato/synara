@@ -8,6 +8,8 @@ import {
   CuaActionError,
   type CuaComputerBackend,
 } from "../../../server/src/computer/CuaComputerBackend";
+import { resolveComputerSemanticTarget } from "../../../server/src/computer/uiTreeTargeting";
+import { startFocusProbe } from "./focusProbe";
 
 interface FixtureState {
   event: "state";
@@ -18,6 +20,10 @@ interface FixtureState {
   clicks: number;
   edits: number;
   text: string;
+  modalWindowId: number;
+  modalClicks: number;
+  keyDowns: number;
+  keyUps: number;
 }
 
 /** The child reports its own controls. Native input is admitted only after
@@ -36,6 +42,7 @@ export async function runNativeFixture(
   let error: unknown;
   let ready = false;
   let stateResponses = 0;
+  let coexistenceProbe: Awaited<ReturnType<typeof startFocusProbe>> = null;
   child.once("error", (failure) => {
     error = failure;
   });
@@ -210,6 +217,107 @@ export async function runNativeFixture(
         reason: "Exact field absent from native tree.",
       });
 
+    await command("sheet-a");
+    try {
+      const declared = await readState();
+      const modalId = `cua:${child.pid}:${declared.modalWindowId}`;
+      const modal = (await backend.listWindows()).find(
+        (candidate) => candidate.pid === child.pid && candidate.id === modalId,
+      );
+      if (!modal) throw new Error("Owned modal identity was not verified.");
+      approveCapture(modalId);
+      await backend.getState({ windowId: target.id, includeTree: true });
+      try {
+        await backend.click(button.activationPoint, target.id);
+        cases.push({ name: "modal-blocks-parent-click", status: "failed" });
+      } catch (failure) {
+        const actual = await readState();
+        cases.push({
+          name: "modal-blocks-parent-click",
+          status:
+            failure instanceof CuaActionError &&
+            failure.effect === "not-dispatched" &&
+            actual.clicks === declared.clicks
+              ? "passed"
+              : "failed",
+          error: String(failure),
+        });
+      }
+      // AppKit exposes an attached sheet beneath its parent's AX window.
+      // Its separate WindowServer id has no AXWindows entry of its own.
+      const modalState = await backend.getState({ windowId: target.id, includeTree: true });
+      if (!modalState.root) throw new Error("Owned modal has no accessibility tree.");
+      const selector = {
+        windowId: target.id,
+        label: "Modal accept",
+        role: "AXButton",
+        refOrdinal: 0,
+      };
+      const match = resolveComputerSemanticTarget(modalState.root, selector);
+      const result = await backend.performAction({ target: selector, ...match }, "press");
+      const actual = await readState();
+      cases.push({
+        name: "exact-modal-control",
+        result,
+        actual,
+        status: actual.modalClicks === declared.modalClicks + 1 ? "passed" : "failed",
+      });
+    } catch (failure) {
+      cases.push({ name: "exact-modal-control", status: "failed", error: String(failure) });
+    } finally {
+      await command("close-sheet-a");
+    }
+
+    if (process.env.SYNARA_CUA_FIXTURE_FOREGROUND === "approved-once") {
+      await command("focus-b");
+      await observe();
+      const before = await readState();
+      const siblingBefore = { ...states.get("B")! };
+      coexistenceProbe = await startFocusProbe({
+        binaryPath: process.env.SYNARA_CUA_FOCUS_PROBE ?? join(binary, "../focus-probe"),
+        hz: 50,
+        settleMs: 0,
+        expect: {
+          pid: siblingBefore.pid,
+          keyWin: siblingBefore.windowId,
+          focusedPid: siblingBefore.pid,
+        },
+        minSamples: 5,
+      });
+      child.stdin.write("user-keys-b\n");
+      let failure: unknown;
+      try {
+        await backend.click(button.activationPoint, target.id);
+      } catch (error) {
+        failure = error;
+      }
+      await pause(400);
+      const actual = await readState();
+      const siblingAfter = { ...states.get("B")! };
+      const probe = coexistenceProbe;
+      coexistenceProbe = null;
+      const focus = await probe?.finish();
+      cases.push({
+        name: "background-click-with-independent-owned-keys",
+        status:
+          !failure &&
+          actual.clicks === before.clicks + 1 &&
+          siblingAfter.keyDowns - siblingBefore.keyDowns === 10 &&
+          siblingAfter.keyUps - siblingBefore.keyUps === 10 &&
+          siblingAfter.text === "hhhhhhhhhh" &&
+          focus?.report.theftFree
+            ? "passed"
+            : "failed",
+        before,
+        actual,
+        siblingBefore,
+        siblingAfter,
+        simulatedInput: "owned AppKit events, no global event injection",
+        focus: focus?.report,
+        error: failure ? String(failure) : undefined,
+      });
+    }
+
     const capture = await backend.captureScreenshot({ kind: "window", windowId: target.id });
     await writeFile(
       join(directory, "native-after.png"),
@@ -243,10 +351,14 @@ export async function runNativeFixture(
       measurements,
     };
   } finally {
-    child.stdin.end("quit\n");
-    const force = setTimeout(() => child.kill("SIGTERM"), 1_000);
-    await exited;
-    clearTimeout(force);
-    lines.close();
+    try {
+      await coexistenceProbe?.finish();
+    } finally {
+      child.stdin.end("quit\n");
+      const force = setTimeout(() => child.kill("SIGTERM"), 1_000);
+      await exited;
+      clearTimeout(force);
+      lines.close();
+    }
   }
 }
