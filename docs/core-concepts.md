@@ -33,6 +33,8 @@ composer; it is not sent twice.
   Settings, with the thread panel beside it and the route shown as a card inset from the window.
   Drag a project onto a space tab or a space pinned to the rail to move it into that space;
   dropping onto Void removes its space assignment. Drops do not open another chat.
+  Project rows in the Spaces catalog and pinned project shortcuts also support these moves.
+  With manual project sorting, drag the row to move spaces or its reorder grip to change list order.
   Open saved threads appear as tabs across the top of the chat. Unsent drafts stay out of
   the tab strip until they become saved threads on the first send. Saved tabs remain
   available to return to while an unsent draft is on screen, including in the editor view.

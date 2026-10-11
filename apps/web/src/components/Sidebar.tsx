@@ -13,6 +13,7 @@ import {
   CodeReviewIcon,
   CopyIcon,
   CustomizeIcon,
+  DragHandleIcon,
   FeedbackIcon,
   GitBranchIcon,
   ExternalLinkIcon,
@@ -61,7 +62,6 @@ import {
   useSyncExternalStore,
   Suspense,
   useState,
-  type DragEvent as ReactDragEvent,
   type ComponentType,
   type MouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -5669,8 +5669,9 @@ export default function Sidebar() {
     // name yields to the overlay toolbar; the trailing run dot stays put and fades
     // in place instead of sliding left. Focus is read from the group because the
     // name container itself is not focusable — the row's button is.
-    const projectToolbarReserveClassName =
-      "group-hover/project-header:pr-[4.75rem] group-has-[:focus-visible]/project-header:pr-[4.75rem]";
+    const projectToolbarReserveClassName = isManualProjectSorting
+      ? "group-hover/project-header:pr-[6.25rem] group-has-[:focus-visible]/project-header:pr-[6.25rem]"
+      : "group-hover/project-header:pr-[4.75rem] group-has-[:focus-visible]/project-header:pr-[4.75rem]";
     // Configured display name only — folder identity lives in the hover card (#1000).
     const projectRowLabel = resolveSidebarProjectRowLabel(project);
 
@@ -5687,26 +5688,22 @@ export default function Sidebar() {
             }
           >
             <SidebarMenuButton
-              ref={isManualProjectSorting ? dragHandleProps?.setActivatorNodeRef : undefined}
               size="sm"
               className={cn(
                 SIDEBAR_HEADER_ROW_CLASS_NAME,
                 "hover:bg-[var(--sidebar-accent)] group-hover/project-header:bg-[var(--sidebar-accent)] group-hover/project-header:text-[var(--sidebar-accent-foreground)]",
-                isManualProjectSorting ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
+                "cursor-grab active:cursor-grabbing",
               )}
-              {...(isManualProjectSorting && dragHandleProps ? dragHandleProps.attributes : {})}
-              {...(isManualProjectSorting && dragHandleProps ? dragHandleProps.listeners : {})}
-              {...(!isManualProjectSorting && spaces.length > 0
-                ? {
-                    // Native drag-to-file: drop the row on a space tab to move the
-                    // project. Manual sort mode is excluded because dnd-kit owns the
-                    // drag gesture there for reordering.
-                    draggable: true,
-                    onDragStart: (event: ReactDragEvent<HTMLButtonElement>) => {
-                      beginProjectDrag(event.dataTransfer, project.id);
-                    },
-                  }
-                : {})}
+              draggable
+              data-project-drag-id={project.id}
+              onDragStart={(event) => {
+                beginProjectDrag(event.dataTransfer, project.id);
+                dragInProgressRef.current = true;
+                suppressProjectClickAfterDragRef.current = true;
+              }}
+              onDragEnd={() => {
+                dragInProgressRef.current = false;
+              }}
               onPointerDownCapture={handleProjectTitlePointerDownCapture}
               onClick={(event) => handleProjectTitleClick(event, project.id)}
               onKeyDown={(event) => handleProjectTitleKeyDown(event, project.id)}
@@ -5784,6 +5781,21 @@ export default function Sidebar() {
               <PinStatusIcon pinned={isProjectPinned} className="size-3.5" />
             </button>
             <SidebarSectionToolbar placement="overlay" revealOnHover>
+              {isManualProjectSorting && dragHandleProps ? (
+                <SidebarIconButton
+                  render={<button type="button" ref={dragHandleProps.setActivatorNodeRef} />}
+                  icon={DragHandleIcon}
+                  label={`Reorder ${project.name}`}
+                  title="Drag to reorder"
+                  className="touch-none cursor-grab active:cursor-grabbing"
+                  {...dragHandleProps.attributes}
+                  {...dragHandleProps.listeners}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                />
+              ) : null}
               {renderProjectThreadActions(project)}
             </SidebarSectionToolbar>
           </PreviewCardTrigger>
@@ -5820,6 +5832,9 @@ export default function Sidebar() {
       <SidebarMenuItem key={project.id}>
         <SidebarMenuButton
           size="sm"
+          draggable
+          data-project-drag-id={project.id}
+          onDragStart={(event) => beginProjectDrag(event.dataTransfer, project.id)}
           className={cn(
             SIDEBAR_HEADER_ROW_CLASS_NAME,
             SIDEBAR_ROW_IDLE_TEXT_CLASS_NAME,
@@ -6804,6 +6819,7 @@ export default function Sidebar() {
         id: shortcut.key,
         glyphs: railProjectGlyphs(project.cwd, project.appearance ?? null),
         label: resolveSidebarProjectRowLabel(project),
+        dragProjectId: project.id,
         badge: null,
         active: activeRailShortcutKey === shortcut.key,
         onSelect: () => {
