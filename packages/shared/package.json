@@ -424,6 +424,10 @@
       "types": "./src/cuaDriverProtocol.ts",
       "import": "./src/cuaDriverProtocol.ts"
     },
+    "./cuaDriverVersion": {
+      "types": "./src/cuaDriverVersion.ts",
+      "import": "./src/cuaDriverVersion.ts"
+    },
     "./desktopOperationQueue": {
       "types": "./src/desktopOperationQueue.ts",
       "import": "./src/desktopOperationQueue.ts"

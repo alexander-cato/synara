@@ -12,6 +12,7 @@
 // `useProvisionComputer.test.tsx`, which owns that mutation.
 
 import type { ComputerStatusResult } from "@synara/contracts";
+import { CUA_DRIVER_VERSION } from "@synara/shared/cuaDriverVersion";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -179,7 +180,7 @@ describe("ComputerSettingsPanel", () => {
         }),
       }),
     });
-    expect(markup).toContain("Cua 0.28.2");
+    expect(markup).toContain(`Cua ${CUA_DRIVER_VERSION}`);
     expect(markup).toContain("native desktop input is unavailable");
     expect(markup).toContain("verified browser runtime");
     expect(markup).not.toContain("shares your Mac");
