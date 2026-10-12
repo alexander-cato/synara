@@ -19,6 +19,7 @@ import {
   computerPermissionSetupMessage,
   missingComputerAppSnapPermissions,
 } from "@synara/shared/computerGrants";
+import { CUA_DRIVER_VERSION } from "@synara/shared/cuaDriverVersion";
 import {
   computerPermissionSetupSupported,
   readLocalComputerPermissionBridge,
@@ -71,7 +72,7 @@ const BACKEND_DISPLAY_NAMES: Record<string, string> = {
   [COMPUTER_HYPRLAND_BACKEND]: "Hyprland plugin",
   [COMPUTER_NESTED_KWIN_BACKEND]: "Isolated agent desktop (nested KWin)",
   [COMPUTER_MAC_BACKEND]: "macOS desktop",
-  cua: "Cua 0.28.2",
+  cua: `Cua ${CUA_DRIVER_VERSION}`,
   fake: "Test backend",
 };
 
