@@ -10,7 +10,8 @@ import {
 } from "@synara/contracts";
 import { localServerAddressLabel, localServerMatchesRun } from "@synara/shared/localServers";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { ChatLinkActionsContext, resolveLinkClickOpener } from "~/lib/linkContextMenu";
 
 import { findDeepestWorkspaceRootMatch } from "../components/Sidebar.logic";
 import { toastManager } from "../components/ui/toast";
@@ -48,6 +49,7 @@ export function useSidebarProjectRunController(input: {
   readonly chatWorkspaceRoot: string | null;
 }) {
   const queryClient = useQueryClient();
+  const linkActions = useContext(ChatLinkActionsContext);
   const projectRunsByProjectId = useProjectRunStore((state) => state.runsByProjectId);
   const storeUpsertProjectRun = useProjectRunStore((state) => state.upsertRun);
   const storeRemoveProjectRun = useProjectRunStore((state) => state.removeRun);
@@ -217,21 +219,29 @@ export function useSidebarProjectRunController(input: {
     [queryClient, storeRemoveProjectRun],
   );
 
-  const openProjectRunServer = useCallback(async (projectId: ProjectId) => {
-    const api = readNativeApi();
-    const server = serverByProjectIdRef.current.get(projectId);
-    const url = server ? firstLocalServerUrl(server) : null;
-    if (!api || !server || !url) return;
-    try {
-      await api.shell.openExternal(url);
-    } catch (error) {
-      toastManager.add({
-        type: "error",
-        title: `Unable to open ${localServerAddressLabel(server)}`,
-        description: error instanceof Error ? error.message : "Unable to open the local server.",
-      });
-    }
-  }, []);
+  const openProjectRunServer = useCallback(
+    async (projectId: ProjectId) => {
+      const api = readNativeApi();
+      const server = serverByProjectIdRef.current.get(projectId);
+      const url = server ? firstLocalServerUrl(server) : null;
+      if (!api || !server || !url) return;
+      const opener = resolveLinkClickOpener(url, linkActions);
+      if (opener) {
+        opener(url);
+        return;
+      }
+      try {
+        await api.shell.openExternal(url);
+      } catch (error) {
+        toastManager.add({
+          type: "error",
+          title: `Unable to open ${localServerAddressLabel(server)}`,
+          description: error instanceof Error ? error.message : "Unable to open the local server.",
+        });
+      }
+    },
+    [linkActions],
+  );
 
   const persistProjectRunCommand = useCallback(
     async (projectId: ProjectId, command: string) => {

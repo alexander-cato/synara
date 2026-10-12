@@ -5,6 +5,14 @@ description: Manage saved accounts, import browser cookies deliberately, and und
 
 Tabs and browser tool access belong to a task, but cookies and signed-in sessions are shared across Synara browser tabs and agent workflows. Moving a tab between the floating browser and right dock does not create a separate session.
 
+## Opening links
+
+In the desktop app, ordinary web links open in the current task’s in-app browser by default. This includes chat markdown, link chips, terminal URLs, PDF links, and other links in the task workspace. Choose **Settings → Chat behavior → Open web links → External browser** to use your system browser instead. The preference is saved on this device. Links open externally in the web app and on surfaces without a task browser.
+
+**Ctrl/Cmd+click** opens chat and document links externally for one click. Terminal URLs require their usual **Ctrl/Cmd+click** to activate and follow the saved preference. Right-click a link and use **Open link** to select an available destination or **Copy link** to copy its URL.
+
+GitHub pull request and issue links use the separate **Open pull requests and issues** preference in **Settings → Chat behavior**. Their default remains Synara’s built-in review view.
+
 ## Saved logins
 
 In the desktop app, open the browser toolbar’s **Saved logins** key button to manage locally saved accounts. The list shows each site, username and whether the login was saved by you or an agent. An unfinished signup can appear separately from a saved account.

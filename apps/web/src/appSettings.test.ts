@@ -20,6 +20,7 @@ import {
   buildInitialServerSettingsMigrationPatch,
   DEFAULT_CHAT_FONT_SIZE_PX,
   DEFAULT_FOLLOW_UP_BEHAVIOR,
+  DEFAULT_WEB_LINK_OPEN_TARGET,
   DEFAULT_TERMINAL_FONT_SIZE_PX,
   didProviderCommandDiscoverySettingsChange,
   didProviderEnablementChange,
@@ -2108,6 +2109,31 @@ describe("AppSettingsSchema", () => {
     expect(
       normalizeStoredAppSettings(decode(JSON.stringify({ enableAppshots: true }))),
     ).not.toHaveProperty("enableAppshots");
+  });
+});
+
+describe("web link preference", () => {
+  const codec = Schema.fromJsonString(AppSettingsSchema);
+  const decode = Schema.decodeSync(codec);
+
+  it("defaults existing profiles to the in-app browser without resetting their other choices", () => {
+    expect(
+      decode(JSON.stringify({ confirmThreadDelete: false, githubLinkOpenTarget: "external" })),
+    ).toMatchObject({
+      webLinkOpenTarget: DEFAULT_WEB_LINK_OPEN_TARGET,
+      githubLinkOpenTarget: "external",
+      confirmThreadDelete: false,
+    });
+  });
+
+  it.each(["browser", "external"] as const)("persists the %s destination", (webLinkOpenTarget) => {
+    const settings = decode(JSON.stringify({ webLinkOpenTarget }));
+    expect(decode(Schema.encodeSync(codec)(settings)).webLinkOpenTarget).toBe(webLinkOpenTarget);
+    expect(normalizeStoredAppSettings(settings).webLinkOpenTarget).toBe(webLinkOpenTarget);
+  });
+
+  it("rejects invalid destinations", () => {
+    expect(() => decode(JSON.stringify({ webLinkOpenTarget: "invalid" }))).toThrow();
   });
 });
 

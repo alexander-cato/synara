@@ -18,12 +18,16 @@ import { afterEach, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
+import { Terminal, type ILink } from "@xterm/xterm";
+import { ChatLinkActionsContext } from "../lib/linkContextMenu";
+import { getNavigatorPlatform, isMacPlatform } from "../lib/utils";
 import { terminalRuntimeRegistry } from "./terminal/terminalRuntimeRegistry";
 import { useTerminalStateStore } from "../terminalStateStore";
 import { closeTerminalSurface } from "../hooks/useTerminalSurfaceController";
 import { disposeAndCloseTerminalSession } from "./terminal/terminalSession";
 
 const api = vi.hoisted(() => ({
+  shell: { openExternal: vi.fn(async (_url: string) => {}) },
   terminal: {
     open: vi.fn(async (input: TerminalOpenInput) => ({
       ...input,
@@ -70,6 +74,56 @@ function panel(threadId: ThreadId, isVisible: boolean) {
     </div>
   );
 }
+
+it("terminal URLs follow the task browser preference, including after it changes", async () => {
+  const url = "http://localhost:5173/docs";
+  const browser = vi.fn();
+  const register = vi.spyOn(Terminal.prototype, "registerLinkProvider");
+  const originalOpen = api.terminal.open.getMockImplementation()!;
+  api.terminal.open.mockImplementationOnce(async (input) => ({
+    ...(await originalOpen(input)),
+    history: `${url}\r\n`,
+  }));
+  const threadId = ThreadId.makeUnsafe("terminal-link-preference");
+  const view = await render(
+    <ChatLinkActionsContext.Provider value={{ openInBrowserPanel: browser }}>
+      {panel(threadId, true)}
+    </ChatLinkActionsContext.Provider>,
+  );
+  try {
+    await expect.poll(() => register.mock.calls.length).toBeGreaterThan(0);
+    const provider = register.mock.calls.at(-1)![0];
+    let links: ILink[] | undefined;
+    await expect
+      .poll(() => {
+        provider.provideLinks(1, (next) => {
+          links = next;
+        });
+        return links?.[0]?.text;
+      })
+      .toBe(url);
+    const mac = isMacPlatform(getNavigatorPlatform());
+    const activate = () =>
+      links![0]!.activate(new MouseEvent("click", { metaKey: mac, ctrlKey: !mac }), url);
+    activate();
+    expect(browser).toHaveBeenCalledWith(url);
+    expect(api.shell.openExternal).not.toHaveBeenCalled();
+    await view.rerender(
+      <ChatLinkActionsContext.Provider
+        value={{ openInBrowserPanel: browser, webLinkOpenTarget: "external" }}
+      >
+        {panel(threadId, true)}
+      </ChatLinkActionsContext.Provider>,
+    );
+    activate();
+    await expect.poll(() => api.shell.openExternal.mock.calls.length).toBe(1);
+    expect(api.shell.openExternal).toHaveBeenCalledWith(url);
+    expect(api.terminal.open).toHaveBeenCalledOnce();
+  } finally {
+    register.mockRestore();
+    await view.unmount();
+  }
+});
 
 it.each(["chat-panel", "dock-terminal:chat-panel"])(
   "keeps one interactive viewport across hide/show in %s",

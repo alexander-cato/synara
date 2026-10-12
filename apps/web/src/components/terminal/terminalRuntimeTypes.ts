@@ -10,6 +10,7 @@ import { Terminal, type IDisposable } from "@xterm/xterm";
 import type { TerminalLinkMatch } from "../../terminal-links";
 
 export interface TerminalRuntimeCallbacks {
+  onOpenLink?: (url: string) => void;
   onSessionExited: () => void;
   onTerminalMetadataChange: (
     terminalId: string,

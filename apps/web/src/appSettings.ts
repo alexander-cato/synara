@@ -217,6 +217,10 @@ export type GitHubInboxInvolvementFilter = typeof GitHubInboxInvolvementFilter.T
 export const GitHubLinkOpenTarget = Schema.Literals(["app", "browser", "external"]);
 export type GitHubLinkOpenTarget = typeof GitHubLinkOpenTarget.Type;
 export const DEFAULT_GITHUB_LINK_OPEN_TARGET: GitHubLinkOpenTarget = "app";
+/** Default destination for ordinary HTTP(S) links when a task browser is available. */
+export const WebLinkOpenTarget = Schema.Literals(["browser", "external"]);
+export type WebLinkOpenTarget = typeof WebLinkOpenTarget.Type;
+export const DEFAULT_WEB_LINK_OPEN_TARGET: WebLinkOpenTarget = "browser";
 export type FollowUpBehavior = typeof FollowUpBehavior.Type;
 // Sound the chat message trail moves with (desktop on macOS).
 export const MessageTrailAudioSource = Schema.Literals(["off", "system", "microphone", "both"]);
@@ -423,6 +427,7 @@ export const AppSettingsSchema = Schema.Struct({
   confirmTerminalTabClose: Schema.Boolean.pipe(withDefaults(() => true)),
   diffWordWrap: Schema.Boolean.pipe(withDefaults(() => false)),
   showPullRequestDiffColors: Schema.Boolean.pipe(withDefaults(() => true)),
+  webLinkOpenTarget: WebLinkOpenTarget.pipe(withDefaults(() => DEFAULT_WEB_LINK_OPEN_TARGET)),
   githubLinkOpenTarget: GitHubLinkOpenTarget.pipe(
     withDefaults(() => DEFAULT_GITHUB_LINK_OPEN_TARGET),
   ),

@@ -16,7 +16,7 @@ import type { PDFDocumentProxy } from "~/lib/pdf/pdfEngine";
 import type { PdfLink } from "~/lib/pdf/pdfLinks";
 import { usePdfPageRender } from "~/lib/pdf/usePdfPageRender";
 import type { PdfPageIntrinsicSize } from "~/lib/pdf/pdfZoom";
-import { openExternalLink } from "~/lib/linkChips";
+import { useLinkOpener } from "~/lib/linkContextMenu";
 
 // Prerender pages within roughly one viewport above/below so scrolling reveals
 // already-painted pages instead of blank boxes.
@@ -131,6 +131,7 @@ function PdfLinkAnchor({
   link: PdfLink;
   onJumpToPage: (pageNumber: number) => void;
 }) {
+  const openLink = useLinkOpener();
   const style = {
     left: `${link.left}px`,
     top: `${link.top}px`,
@@ -148,7 +149,7 @@ function PdfLinkAnchor({
         title={url}
         onClick={(event) => {
           event.preventDefault();
-          openExternalLink(url);
+          openLink(url, event);
         }}
       >
         <span className="sr-only">{url}</span>
