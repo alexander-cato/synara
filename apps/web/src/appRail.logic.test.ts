@@ -202,7 +202,7 @@ describe("buildRailSpacesSections", () => {
     { id: home, name: "Home" },
   ] as unknown as Space[];
 
-  it("orders the active space first, keeps empty spaces, and drops an empty Void", () => {
+  it("orders the active space first and keeps empty spaces and Void as drop targets", () => {
     const sections = buildRailSpacesSections({
       items: [{ id: "a", spaceId: work }],
       spaces,
@@ -212,6 +212,7 @@ describe("buildRailSpacesSections", () => {
     });
     expect(sections.map((section) => [section.name, section.items.length])).toEqual([
       ["Home", 0],
+      [DEFAULT_VOID_SPACE.name, 0],
       ["Work", 1],
     ]);
   });

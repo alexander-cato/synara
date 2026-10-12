@@ -14,6 +14,9 @@ import {
   useContext,
 } from "react";
 import { createPortal } from "react-dom";
+import type { ProjectId } from "@synara/contracts";
+import { useProjectDropTarget } from "~/hooks/useProjectDropTarget";
+import { beginProjectDrag } from "~/lib/projectDrag";
 
 import { TasksCoachmark } from "./OneTimeCoachmark";
 import type { RailItemId } from "~/appRail.logic";
@@ -132,6 +135,8 @@ export type AppRailItem = {
   readonly onSelect: () => void;
   readonly onMouseEnter?: (() => void) | undefined;
   readonly onFocus?: (() => void) | undefined;
+  readonly onProjectDrop?: ((projectId: ProjectId) => void) | undefined;
+  readonly dragProjectId?: ProjectId | undefined;
 };
 
 type AppRailProps = {
@@ -162,6 +167,7 @@ export function appRailButtonClassName(active: boolean): string {
 }
 
 function AppRailButton({ item }: { item: AppRailItem }) {
+  const { isProjectOver, projectDropProps } = useProjectDropTarget(item.onProjectDrop);
   const label = item.badge ? `${item.label} · ${item.badge.accessibleLabel}` : item.label;
   const glyphs = item.glyphs;
   const button = (
@@ -173,8 +179,19 @@ function AppRailButton({ item }: { item: AppRailItem }) {
       tooltip={item.id === "tasks" ? undefined : label}
       tooltipSide="right"
       aria-current={item.active ? "page" : undefined}
-      className={appRailButtonClassName(item.active)}
+      className={cn(
+        appRailButtonClassName(item.active),
+        isProjectOver && "ring-1 ring-ring ring-inset",
+      )}
       onClick={item.onSelect}
+      {...projectDropProps}
+      draggable={item.dragProjectId !== undefined}
+      data-project-drag-id={item.dragProjectId}
+      onDragStart={
+        item.dragProjectId
+          ? (event) => beginProjectDrag(event.dataTransfer, item.dragProjectId!)
+          : undefined
+      }
       {...(item.onMouseEnter ? { onMouseEnter: item.onMouseEnter } : {})}
       {...(item.onFocus ? { onFocus: item.onFocus } : {})}
     />

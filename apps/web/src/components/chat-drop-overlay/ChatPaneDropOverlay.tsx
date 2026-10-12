@@ -3,7 +3,13 @@
 // Layer: UI component (route surfaces wrap it around <ChatView /> or empty-state placeholders)
 // Exports: ChatPaneDropOverlay component, drag MIME constant, drop-zone helpers used by tests
 
-import { useEffect, useRef, type DragEvent as ReactDragEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type DragEvent as ReactDragEvent,
+  type ReactNode,
+} from "react";
 import { type ThreadId } from "@synara/contracts";
 
 import { type SplitDirection, type SplitDropSide } from "../../splitViewStore";
@@ -11,6 +17,7 @@ import {
   getActiveThreadDragId,
   isThreadDragTransfer,
   isWithinThreadMentionDropzone,
+  isWithinThreadDropTarget,
   readThreadDragPayload,
   type ThreadDragPayload,
 } from "../../lib/threadDrag";
@@ -144,7 +151,7 @@ export function ChatPaneDropOverlay(props: ChatPaneDropOverlayProps) {
     return canDropInDirection ? canDropInDirection(direction) : true;
   };
 
-  const setPreviewZone = (zone: DropZone | null) => {
+  const setPreviewZone = useCallback((zone: DropZone | null) => {
     const preview = previewRef.current;
     if (!preview) return;
     const nextClassName = zone
@@ -159,13 +166,13 @@ export function ChatPaneDropOverlay(props: ChatPaneDropOverlayProps) {
     }
     preview.dataset.chatPaneDropZone = zone;
     preview.className = nextClassName;
-  };
+  }, []);
 
-  const resetOverlayState = () => {
+  const resetOverlayState = useCallback(() => {
     rectRef.current = null;
     rectMeasuredAtRef.current = 0;
     setPreviewZone(null);
-  };
+  }, [setPreviewZone]);
 
   const getCurrentRect = () => {
     const wrapper = wrapperRef.current;
@@ -204,17 +211,18 @@ export function ChatPaneDropOverlay(props: ChatPaneDropOverlayProps) {
     return zone;
   };
 
-  // The composer turns a thread drop into an @mention; it owns the event there,
-  // so only drop the split preview left over from the surrounding pane.
-  const deferToMentionDropzone = (event: ReactDragEvent<HTMLDivElement>): boolean => {
-    if (!isWithinThreadMentionDropzone(event.target)) return false;
+  // Composer mentions and opening tabs own their nested drops. Clear any split
+  // preview left over from the surrounding pane when entering either target.
+  const deferToNestedDropTarget = (event: ReactDragEvent<HTMLDivElement>): boolean => {
+    if (!isWithinThreadMentionDropzone(event.target) && !isWithinThreadDropTarget(event.target))
+      return false;
     setPreviewZone(null);
     return true;
   };
 
   const handleDragEnter = (event: ReactDragEvent<HTMLDivElement>) => {
     if (!isThreadDrag(event)) return;
-    if (deferToMentionDropzone(event)) return;
+    if (deferToNestedDropTarget(event)) return;
     event.preventDefault();
     event.stopPropagation();
     rectRef.current = wrapperRef.current?.getBoundingClientRect() ?? null;
@@ -226,7 +234,7 @@ export function ChatPaneDropOverlay(props: ChatPaneDropOverlayProps) {
 
   const handleDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
     if (!isThreadDrag(event)) return;
-    if (deferToMentionDropzone(event)) return;
+    if (deferToNestedDropTarget(event)) return;
     event.preventDefault();
     event.stopPropagation();
     const zone = getAllowedZoneForEvent(event);
@@ -245,7 +253,7 @@ export function ChatPaneDropOverlay(props: ChatPaneDropOverlayProps) {
 
   const handleDrop = (event: ReactDragEvent<HTMLDivElement>) => {
     if (!isThreadDrag(event)) return;
-    if (deferToMentionDropzone(event)) {
+    if (deferToNestedDropTarget(event)) {
       resetOverlayState();
       return;
     }
@@ -264,7 +272,15 @@ export function ChatPaneDropOverlay(props: ChatPaneDropOverlayProps) {
 
   useEffect(() => {
     resetOverlayState();
-    return resetOverlayState;
+    // Capture also sees drops that a nested target handles with stopPropagation,
+    // and clears previews when a native drag ends outside this pane.
+    window.addEventListener("drop", resetOverlayState, true);
+    window.addEventListener("dragend", resetOverlayState, true);
+    return () => {
+      window.removeEventListener("drop", resetOverlayState, true);
+      window.removeEventListener("dragend", resetOverlayState, true);
+      resetOverlayState();
+    };
   }, [paneScopeId, resetOverlayState]);
 
   return (

@@ -6,6 +6,7 @@
 
 import { GLASS_RAISED_SURFACE_CLASS_NAME } from "~/surfaceStyles";
 import type { ThreadId } from "@synara/contracts";
+import { beginThreadDrag, endThreadDrag } from "~/lib/threadDrag";
 
 import {
   resolveThreadPullRequestFallback,
@@ -49,6 +50,8 @@ export interface KanbanCardViewProps {
   isDragSource?: boolean;
   /** Shared wall-clock tick from the board root for live elapsed labels. */
   nowMs?: number;
+  /** Native thread references; sortable drafts retain the board's dispatch gesture. */
+  threadDraggable?: boolean;
 }
 
 /**
@@ -150,9 +153,12 @@ function KanbanCardViewComponent({
   isOverlay: isOverlayProp,
   isDragSource: isDragSourceProp,
   nowMs,
+  threadDraggable = false,
 }: KanbanCardViewProps) {
   const isOverlay = isOverlayProp ?? false;
   const isDragSource = isDragSourceProp ?? false;
+  const canDragThread =
+    threadDraggable && !isOverlay && card.thread !== null && card.thread.archivedAt == null;
   // Thread-backed draft cards keep their own title, so the unsent prompt is shown
   // separately; local drafts and unsent-prompt cards already title themselves from it.
   const showDraftPreview =
@@ -186,6 +192,9 @@ function KanbanCardViewComponent({
     <button
       type="button"
       tabIndex={isOverlay ? -1 : 0}
+      draggable={canDragThread}
+      onDragStart={canDragThread ? (event) => beginThreadDrag(event, card.threadId) : undefined}
+      onDragEnd={canDragThread ? endThreadDrag : undefined}
       onClick={onOpen ? () => onOpen(card) : undefined}
       onContextMenu={onContextMenu ? (event) => onContextMenu(card, event) : undefined}
       onKeyDown={onKeyDown ? (event) => onKeyDown(card, event) : undefined}

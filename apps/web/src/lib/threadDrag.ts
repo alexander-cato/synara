@@ -10,6 +10,7 @@ export const THREAD_DRAG_MIME = "application/x-synara-thread";
 
 // Marks the composer region where a thread drop becomes an @mention instead of a split.
 export const THREAD_MENTION_DROPZONE_ATTRIBUTE = "data-thread-mention-dropzone";
+export const THREAD_DROP_TARGET_ATTRIBUTE = "data-thread-drop-target";
 
 export interface ThreadDragPayload {
   threadId: ThreadId;
@@ -75,9 +76,17 @@ export function readThreadDragPayload(
 }
 
 export function isWithinThreadMentionDropzone(target: unknown): boolean {
+  return isWithinThreadDropzone(target, THREAD_MENTION_DROPZONE_ATTRIBUTE);
+}
+
+export function isWithinThreadDropTarget(target: unknown): boolean {
+  return isWithinThreadDropzone(target, THREAD_DROP_TARGET_ATTRIBUTE);
+}
+
+function isWithinThreadDropzone(target: unknown, attribute: string): boolean {
   if (typeof Node === "undefined" || !(target instanceof Node)) return false;
   // Drag events can target a text node inside the editor.
   const element = target instanceof Element ? target : target.parentElement;
   if (!element) return false;
-  return element.closest(`[${THREAD_MENTION_DROPZONE_ATTRIBUTE}="true"]`) !== null;
+  return element.closest(`[${attribute}="true"]`) !== null;
 }

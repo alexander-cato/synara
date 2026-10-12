@@ -11,6 +11,8 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from 
 import { restrictToFirstScrollableAncestor, restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 import { SortableContext, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import type { ThreadId } from "@synara/contracts";
+import { useThreadDropTarget } from "~/hooks/useThreadDropTarget";
 import {
   type ComponentProps,
   type CSSProperties,
@@ -131,8 +133,16 @@ export function SurfaceContentTabs<Key extends string>(props: {
   selectionAria?: ComponentProps<typeof SurfaceTabChip>["selectionAria"];
   /** Drops the dragged tab onto another tab's slot. Omitted, the tabs are not draggable. */
   onMove?: ((key: Key, overKey: Key) => void) | undefined;
+  /** Native sidebar/card drops open a chat; dock strips omit these callbacks. */
+  onThreadDrop?: ((threadId: ThreadId) => void) | undefined;
+  canDropThread?: ((threadId: ThreadId | null) => boolean) | undefined;
 }) {
   const { tabs, activeKey, onMove } = props;
+  const { isThreadOver, threadDropProps } = useThreadDropTarget({
+    disabled: !props.onThreadDrop,
+    canDropThread: (threadId) => props.canDropThread?.(threadId) ?? true,
+    onDropThread: (threadId) => props.onThreadDrop?.(threadId),
+  });
   // A press that travels becomes a drag; a still one stays a click on the tab or its X.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const navRef = useRef<HTMLElement>(null);
@@ -236,7 +246,11 @@ export function SurfaceContentTabs<Key extends string>(props: {
     <nav
       ref={navRef}
       aria-label={props.ariaLabel}
-      className="flex min-w-0 flex-1"
+      className={cn(
+        "flex min-w-0 flex-1 rounded-md",
+        isThreadOver && "ring-1 ring-ring ring-inset",
+      )}
+      {...threadDropProps}
       style={
         frozenTabWidthPx === null
           ? undefined

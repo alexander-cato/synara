@@ -3794,6 +3794,222 @@ describe("ChatView transcript geometry (full app)", () => {
     },
   );
 
+  it.each(["manual list", "Spaces catalog", "pinned project"])(
+    "drags projects from the %s into a pinned space",
+    async (source) => {
+      const destinationSpaceId = SpaceId.makeUnsafe("drag-destination");
+      localStorage.setItem(
+        "synara:app-settings:v1",
+        JSON.stringify({
+          sidebarProjectSortOrder: source === "manual list" ? "manual" : "updated_at",
+          railShortcuts: [`space:${destinationSpaceId}`, "project:project-1"],
+        }),
+      );
+      const snapshot = createSnapshotForTargetUser({
+        targetMessageId: MessageId.makeUnsafe("drag-project"),
+        targetText: "Drag project",
+      });
+      const mounted = await mountChatView({
+        viewport: DEFAULT_VIEWPORT,
+        snapshot: {
+          ...snapshot,
+          spaces: [
+            {
+              id: destinationSpaceId,
+              name: "Destination",
+              icon: "bag",
+              sortOrder: 0,
+              createdAt: NOW_ISO,
+              updatedAt: NOW_ISO,
+              deletedAt: null,
+            },
+          ],
+        },
+      });
+      try {
+        const primary = page.getByRole("navigation", { name: "Primary" });
+        if (source === "Spaces catalog")
+          await primary.getByRole("button", { name: "Spaces", exact: true }).click();
+        const selector =
+          source === "pinned project"
+            ? 'nav[aria-label="Primary"] [data-project-drag-id="project-1"]'
+            : '[data-slot="sidebar-container"] [data-project-drag-id="project-1"]';
+        const row = await waitForElement(
+          () => document.querySelector<HTMLButtonElement>(selector),
+          "Project drag row missing",
+        );
+        if (source === "manual list") {
+          await expect
+            .element(page.getByRole("button", { name: "Reorder Project", exact: true }))
+            .toBeInTheDocument();
+        }
+        const routeBefore = mounted.router.state.location.pathname;
+        await userEvent.dragAndDrop(
+          row,
+          primary.getByRole("button", { name: "Destination", exact: true }),
+        );
+        await expect
+          .poll(
+            () =>
+              wsRequests
+                .map(readDispatchedCommand)
+                .filter(
+                  (command) =>
+                    command?.type === "project.meta.update" &&
+                    command.projectId === PROJECT_ID &&
+                    command.spaceId === destinationSpaceId,
+                ).length,
+          )
+          .toBe(1);
+        expect(mounted.router.state.location.pathname).toBe(routeBefore);
+        expect(
+          wsRequests
+            .map(readDispatchedCommand)
+            .some((command) => command?.type === "space.reorder"),
+        ).toBe(false);
+      } finally {
+        await mounted.cleanup();
+        useSpacesUiStore.getState().setActiveSpaceId(null);
+        useRailShellStore.getState().closeSpacesProject();
+        useRailShellStore.getState().selectPanelItem("home");
+      }
+    },
+  );
+
+  it("reorders projects with the manual grip while keeping the current chat open", async () => {
+    localStorage.setItem(
+      "synara:app-settings:v1",
+      JSON.stringify({ sidebarProjectSortOrder: "manual" }),
+    );
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: withOpenProjectPickerFixtures(
+        createSnapshotForTargetUser({
+          targetMessageId: MessageId.makeUnsafe("drag-reorder"),
+          targetText: "Reorder projects",
+        }),
+      ),
+    });
+    try {
+      const orderBefore = useStore.getState().projects.map((project) => project.id);
+      const row = document.querySelector<HTMLButtonElement>(
+        '[data-slot="sidebar-container"] [data-project-drag-id="project-1"]',
+      )!;
+      await userEvent.hover(row);
+      const grip = page.getByRole("button", { name: "Reorder Project", exact: true }).element();
+      const from = grip.getBoundingClientRect();
+      const to = document
+        .querySelector<HTMLButtonElement>(
+          '[data-slot="sidebar-container"] [data-project-drag-id="project-2"]',
+        )!
+        .getBoundingClientRect();
+      const pointer = (type: string, y: number) =>
+        new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          clientX: from.x + from.width / 2,
+          clientY: y,
+          button: 0,
+          buttons: type === "pointerup" ? 0 : 1,
+          pointerId: 1,
+          isPrimary: true,
+          pointerType: "mouse",
+        });
+      const fromY = from.y + from.height / 2;
+      const toY = to.y + to.height / 2;
+      grip.dispatchEvent(pointer("pointerdown", fromY));
+      for (let step = 1; step <= 8; step++) {
+        grip.dispatchEvent(pointer("pointermove", fromY + ((toY - fromY) * step) / 8));
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      grip.dispatchEvent(pointer("pointerup", toY));
+      await expect
+        .poll(() => useStore.getState().projects.map((project) => project.id))
+        .toEqual([...orderBefore].reverse());
+      expect(mounted.router.state.location.pathname).toBe(`/${THREAD_ID}`);
+      expect(
+        wsRequests
+          .map(readDispatchedCommand)
+          .some((command) => command?.type === "project.meta.update" && "spaceId" in command),
+      ).toBe(false);
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it.each(["empty space", "populated space", "Void"])(
+    "moves projects by dropping onto the catalog's %s section",
+    async (destination) => {
+      const spaceId = SpaceId.makeUnsafe("catalog-destination");
+      const snapshot = withOpenProjectPickerFixtures(
+        createSnapshotForTargetUser({
+          targetMessageId: MessageId.makeUnsafe("catalog-drop"),
+          targetText: "Catalog drop",
+        }),
+      );
+      const mounted = await mountChatView({
+        viewport: DEFAULT_VIEWPORT,
+        snapshot: {
+          ...snapshot,
+          spaces: [
+            {
+              id: spaceId,
+              name: "Destination",
+              icon: "bag",
+              sortOrder: 0,
+              createdAt: NOW_ISO,
+              updatedAt: NOW_ISO,
+              deletedAt: null,
+            },
+          ],
+          projects: snapshot.projects.map((project) => ({
+            ...project,
+            spaceId:
+              destination === "Void" ||
+              (destination === "populated space" && project.id === OTHER_PROJECT_ID)
+                ? spaceId
+                : null,
+          })),
+        },
+      });
+      try {
+        await page
+          .getByRole("navigation", { name: "Primary" })
+          .getByRole("button", { name: "Spaces", exact: true })
+          .click();
+        const row = await waitForElement(
+          () =>
+            document.querySelector<HTMLButtonElement>(
+              '[data-slot="sidebar-container"] [data-project-drag-id="project-1"]',
+            ),
+          "Catalog project missing",
+        );
+        const target = page.getByRole("region", {
+          name: destination === "Void" ? "Void projects" : "Destination projects",
+          exact: true,
+        });
+        await userEvent.dragAndDrop(row, target);
+        await expect
+          .poll(() =>
+            wsRequests
+              .map(readDispatchedCommand)
+              .find(
+                (command) =>
+                  command?.type === "project.meta.update" && command.projectId === PROJECT_ID,
+              ),
+          )
+          .toMatchObject({ spaceId: destination === "Void" ? null : spaceId });
+        expect(mounted.router.state.location.pathname).toBe(`/${THREAD_ID}`);
+        await expect.element(target).not.toHaveClass(/ring-ring/);
+      } finally {
+        await mounted.cleanup();
+        useSpacesUiStore.getState().setActiveSpaceId(null);
+        useRailShellStore.getState().closeSpacesProject();
+        useRailShellStore.getState().selectPanelItem("home");
+      }
+    },
+  );
+
   it("creates a project in the rail Space whose Add project button was clicked", async () => {
     const currentSpaceId = SpaceId.makeUnsafe("rail-current");
     const destinationSpaceId = SpaceId.makeUnsafe("rail-destination");
@@ -13202,6 +13418,56 @@ describe("ChatView transcript geometry (full app)", () => {
       }
     },
   );
+
+  it.each(["tabs", "composer"])("drops a saved sidebar thread onto the %s", async (destination) => {
+    useOpenThreadTabsStore.setState({ threadIds: [] });
+    const snapshot = addThreadToSnapshot(
+      createSnapshotForTargetUser({
+        targetMessageId: MessageId.makeUnsafe("native-thread-drop"),
+        targetText: "Drop a chat",
+      }),
+      OTHER_THREAD_ID,
+    );
+    const mounted = await mountChatView({ viewport: DEFAULT_VIEWPORT, snapshot });
+    try {
+      expect(useOpenThreadTabsStore.getState().threadIds).not.toContain(OTHER_THREAD_ID);
+      const target =
+        destination === "tabs"
+          ? page.getByRole("navigation", { name: "Open threads" })
+          : document.querySelector<HTMLElement>('[data-thread-mention-dropzone="true"]')!;
+      await userEvent.dragAndDrop(
+        page.getByRole("button", { name: "Open New thread", exact: true }),
+        target,
+      );
+      if (destination === "tabs") {
+        await expect.poll(() => mounted.router.state.location.pathname).toBe(`/${OTHER_THREAD_ID}`);
+        expect(useOpenThreadTabsStore.getState().threadIds).toEqual([THREAD_ID, OTHER_THREAD_ID]);
+        await expect
+          .element(
+            page
+              .getByRole("navigation", { name: "Open threads" })
+              .getByRole("button", { name: "New thread", exact: true }),
+          )
+          .toHaveAttribute("aria-current", "page");
+        expect(mounted.router.state.location.search.splitViewId).toBeUndefined();
+        await expect
+          .poll(() => document.querySelectorAll("[data-chat-pane-drop-zone]").length)
+          .toBe(0);
+      } else {
+        await expect
+          .poll(() => useComposerDraftStore.getState().draftsByThreadId[THREAD_ID]?.mentions)
+          .toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ path: `thread://${OTHER_THREAD_ID}` }),
+            ]),
+          );
+        expect(mounted.router.state.location.pathname).toBe(`/${THREAD_ID}`);
+        expect(useOpenThreadTabsStore.getState().threadIds).not.toContain(OTHER_THREAD_ID);
+      }
+    } finally {
+      await mounted.cleanup();
+    }
+  });
 
   it("keeps close-button pointer travel from starting a horizontal tab drag", async () => {
     const snapshot = addThreadToSnapshot(

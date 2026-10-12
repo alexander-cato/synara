@@ -7,6 +7,8 @@ import { useEffect, useRef, type ClipboardEvent, type DragEvent } from "react";
 
 import { CHAT_FILE_REFERENCE_DRAG_TYPE } from "~/lib/chatReferences";
 import { isDroppedComposerDirectory, splitDroppedComposerFiles } from "~/lib/composerDropPaths";
+import { isInternalDragTransition as isComposerDropzoneInternalDragTransition } from "~/lib/dragTransition";
+export { isInternalDragTransition as isComposerDropzoneInternalDragTransition } from "~/lib/dragTransition";
 
 export interface ComposerDropzoneFileSplit {
   readonly imageFiles: File[];
@@ -86,31 +88,6 @@ export function shouldPreventDefaultForUnhandledFileDrop(
     shouldResetComposerDropzoneAfterUnhandledFileDrop(files, genericFiles) &&
     genericFiles !== "fallthrough"
   );
-}
-
-function hasContainsMethod(value: unknown): value is { contains: (target: unknown) => boolean } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "contains" in value &&
-    typeof (value as { contains?: unknown }).contains === "function"
-  );
-}
-
-// Drag events bubble through every child under the bound dropzone. Treat only
-// transitions across the dropzone boundary as state changes.
-export function isComposerDropzoneInternalDragTransition(
-  currentTarget: unknown,
-  relatedTarget: unknown,
-): boolean {
-  if (!relatedTarget || !hasContainsMethod(currentTarget)) {
-    return false;
-  }
-  try {
-    return currentTarget.contains(relatedTarget);
-  } catch {
-    return false;
-  }
 }
 
 function isComposerHandledDragForMode(

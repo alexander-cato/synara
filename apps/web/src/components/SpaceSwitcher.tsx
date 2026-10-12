@@ -18,12 +18,12 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type DragEvent,
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
 
 import type { Space } from "~/types";
+import { useProjectDropTarget } from "~/hooks/useProjectDropTarget";
 import { createClientPointMenuAnchor } from "~/lib/clientPointMenuAnchor";
 import {
   DEFAULT_VOID_SPACE,
@@ -46,24 +46,6 @@ import { Menu, MenuGroup, MenuItem } from "./ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
 export type SpaceActivityTone = "attention" | "running" | "completed";
-
-/** HTML5 drag payload for filing a project by dropping it onto a space tab. */
-export const PROJECT_SPACE_DRAG_MIME = "application/x-synara-project";
-
-function readDraggedProjectId(event: DragEvent): ProjectId | null {
-  try {
-    const payload = JSON.parse(event.dataTransfer.getData(PROJECT_SPACE_DRAG_MIME)) as {
-      projectId?: string;
-    } | null;
-    return payload?.projectId ? (payload.projectId as ProjectId) : null;
-  } catch {
-    return null;
-  }
-}
-
-function isProjectDrag(event: DragEvent): boolean {
-  return event.dataTransfer.types.includes(PROJECT_SPACE_DRAG_MIME);
-}
 
 /**
  * A tab dot is a whole space summarised into one pixel, so it has to speak the same
@@ -153,39 +135,7 @@ function SpaceTab(props: {
 }) {
   const toneLabel = props.activityTone ? SPACE_ACTIVITY_LABEL[props.activityTone] : null;
   const detail = toneLabel ?? props.hint ?? null;
-  // Counter, not a boolean: dragenter/dragleave also fire for the tab's child spans, and
-  // a boolean would flicker off while the pointer crosses them.
-  const dragDepthRef = useRef(0);
-  const [dropActive, setDropActive] = useState(false);
-  const { onProjectDrop } = props;
-
-  const dropHandlers = onProjectDrop
-    ? {
-        onDragOver: (event: DragEvent<HTMLButtonElement>) => {
-          if (!isProjectDrag(event)) return;
-          event.preventDefault();
-          event.dataTransfer.dropEffect = "move";
-        },
-        onDragEnter: (event: DragEvent<HTMLButtonElement>) => {
-          if (!isProjectDrag(event)) return;
-          dragDepthRef.current += 1;
-          setDropActive(true);
-        },
-        onDragLeave: (event: DragEvent<HTMLButtonElement>) => {
-          if (!isProjectDrag(event)) return;
-          dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-          if (dragDepthRef.current === 0) setDropActive(false);
-        },
-        onDrop: (event: DragEvent<HTMLButtonElement>) => {
-          dragDepthRef.current = 0;
-          setDropActive(false);
-          const projectId = readDraggedProjectId(event);
-          if (!projectId) return;
-          event.preventDefault();
-          onProjectDrop(projectId);
-        },
-      }
-    : {};
+  const { isProjectOver, projectDropProps } = useProjectDropTarget(props.onProjectDrop);
 
   return (
     <Tooltip>
@@ -204,13 +154,13 @@ function SpaceTab(props: {
             onClick={props.onSelect}
             onDoubleClick={props.onEdit}
             {...(props.onContextMenu ? { onContextMenu: props.onContextMenu } : {})}
-            {...dropHandlers}
+            {...projectDropProps}
             {...(props.sortable ? { style: props.sortable.style } : {})}
             className={cn(
               SPACE_TAB_CLASS_NAME,
               props.active && SPACE_TAB_ACTIVE_CLASS_NAME,
               props.sortable?.isDragging && "z-20 opacity-70",
-              dropActive && "bg-[var(--sidebar-accent)] ring-1 ring-ring ring-inset",
+              isProjectOver && "bg-[var(--sidebar-accent)] ring-1 ring-ring ring-inset",
             )}
           />
         }

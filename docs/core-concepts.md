@@ -31,8 +31,16 @@ composer; it is not sent twice.
 - **Sidebar** — projects, spaces, tasks, and activity requiring attention. The rail
   is a fixed column of icon tabs for Home, Spaces, Tasks, Code review, Automations, Hubs, and
   Settings, with the thread panel beside it and the route shown as a card inset from the window.
-  Open saved threads appear as tabs across the top of the chat. Unsent drafts stay out of
-  the tab strip until they become saved threads on the first send. Saved tabs remain
+  Drag a project onto a space tab or a space pinned to the rail to move it into that space;
+  dropping onto Void removes its space assignment. Drops do not open another chat.
+  Project rows in the Spaces catalog and pinned project shortcuts also support these moves.
+  With manual project sorting, drag the row to move spaces or its reorder grip to change list order.
+  In the Spaces catalog, each space section accepts drops across its header, project list,
+  and empty state, so spaces do not need a pinned shortcut to receive projects.
+  Open saved threads appear as tabs across the top of the chat.
+  Drag a saved chat from the sidebar or Activity onto the open-chat tab strip to open and
+  select it. Dropping onto a composer inserts a chat mention; dropping onto a pane edge splits chats.
+  Unsent drafts stay out of the tab strip until they become saved threads on the first send. Saved tabs remain
   available to return to while an unsent draft is on screen, including in the editor view.
   The command palette searches titles, project metadata, and settled user/assistant messages
   across saved chats, including chats not recently opened. Archived, deleted, and subagent
@@ -65,6 +73,10 @@ composer; it is not sent twice.
   ordinary project; local composer drafts remain client-only. Gateway draft creation uses
   the local checkout; isolated worktree callers can create a task instead. These tools do
   not change the Tasks to-do records; the `synara_*_todo` tools do.
+  Drag a project heading from the Kanban overview onto a pinned space to move the project.
+  Saved chat cards in the overview and outside a project board's sortable Draft column can
+  be dragged to the same tab, mention, and split destinations as sidebar chat rows. Sortable
+  Draft cards keep their reorder and dispatch gesture; local drafts are not chat references.
 - **Inbox** (Stable and Beta) — chats needing attention, running and finished work, review
   requests, and the day’s agent recap, starting at 4am. Inbox also shows today’s due and overdue
   to-dos: add one due today, or select it to edit and delegate through the same card as Tasks.
