@@ -21,6 +21,7 @@ export * from "./providerInstance";
 export * from "./providerRuntime";
 export * from "./model";
 export * from "./agentMentions";
+export * from "./agentSetup";
 export * from "./agentGateway";
 export * from "./externalMcp";
 export * from "./ws";

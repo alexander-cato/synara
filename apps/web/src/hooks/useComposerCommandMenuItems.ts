@@ -349,7 +349,13 @@ export function useComposerCommandMenuItems(input: {
       }
       // Static fallback
       return rankProviderDiscoveryItems(
-        getAgentMentionAutocompleteAliases(provider),
+        getAgentMentionAutocompleteAliases(provider).filter(
+          (definition) =>
+            definition.kind !== "model" ||
+            searchableModelOptions.some(
+              (model) => model.provider === provider && model.slug === definition.model,
+            ),
+        ),
         query,
         ({ alias, displayName }) => [{ value: alias }, { value: displayName }],
       ).map(({ alias, displayName, color }) => ({

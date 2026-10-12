@@ -167,10 +167,10 @@ export const SETTINGS_NAV_ITEMS: readonly SettingsNavItem[] = [
   {
     id: "skills",
     group: "coding",
-    label: "Agent skills",
-    description: "Review reusable workflows discovered across all configured providers.",
+    label: "Agent setup",
+    description: "Edit shared instructions, skills, and roles; review client exports and drift.",
     icon: "building-blocks",
-    eyebrow: "Reusable workflows",
+    eyebrow: "Portable configuration",
   },
   {
     id: "worktrees",

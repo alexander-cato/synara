@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   clearSkillsCatalogCacheForTests,
+  bindManagedSkillDescriptors,
   discoverSkillsCatalog,
   filterDisabledSkills,
   mergeSkillsIntoCatalog,
@@ -24,6 +25,42 @@ import { pathIsWithin } from "./claudePluginSkills.ts";
 let root: string;
 let homeDir: string;
 let synaraBaseDir: string;
+
+describe("registered resource identity", () => {
+  it("binds native external resources by canonical path while preserving plugin names and origins", async () => {
+    const source = path.join(homeDir, ".claude/skills/synced/account/example");
+    await writeSkill(source, "example", "A synced example");
+    await mkdir(path.join(homeDir, ".agents"), { recursive: true });
+    await writeFile(
+      path.join(homeDir, ".agents/setup.json"),
+      JSON.stringify({
+        resources: [
+          {
+            id: "external:registered",
+            kind: "skill",
+            source,
+            enabled: true,
+            ownership: "external",
+          },
+        ],
+      }),
+    );
+    const skill: ProviderSkillDescriptor = {
+      name: "plugin:example",
+      path: path.join(source, "SKILL.md"),
+      scope: "claude",
+      enabled: true,
+    };
+    const bound = await bindManagedSkillDescriptors([skill], homeDir);
+    expect(bound[0]).toMatchObject({
+      resourceId: "external:registered",
+      name: "plugin:example",
+      scope: "claude",
+      ownership: "external",
+    });
+    expect(filterDisabledSkills(bound, ["external:registered"])).toEqual([]);
+  });
+});
 
 async function writeSkill(skillDir: string, name: string, description: string): Promise<void> {
   await mkdir(skillDir, { recursive: true });
@@ -465,12 +502,12 @@ describe("discoverSkillsCatalog", () => {
     expect(linkedSkill?.path).toContain(path.join(".claude", "skills", "check-code", "SKILL.md"));
   });
 
-  it("can include duplicate skill names from different origins for settings", async () => {
+  it("keeps divergent skill identities visible across origins", async () => {
     await writeSkill(path.join(homeDir, ".codex", "skills", "reviewer"), "reviewer", "Codex");
     await writeSkill(path.join(homeDir, ".claude", "skills", "reviewer"), "reviewer", "Claude");
 
     const defaultCatalog = await discoverSkillsCatalog({ homeDir, synaraBaseDir });
-    expect(defaultCatalog.filter((skill) => skill.name === "reviewer")).toHaveLength(1);
+    expect(defaultCatalog.filter((skill) => skill.name === "reviewer")).toHaveLength(2);
     expect(defaultCatalog.find((skill) => skill.name === "reviewer")?.scope).toBe("codex");
 
     const settingsCatalog = await discoverSkillsCatalog({
@@ -602,13 +639,13 @@ description: Direct Pi markdown skill
     expect(skills.find((skill) => skill.name === "portable")?.scope).toBe("synara");
   });
 
-  it("dedupes same-named skills within a root deterministically", async () => {
+  it("preserves same-named packages in deterministic path order", async () => {
     await writeSkill(path.join(synaraBaseDir, "skills", "zeta"), "twin", "Copy in zeta");
     await writeSkill(path.join(synaraBaseDir, "skills", "alpha"), "twin", "Copy in alpha");
 
     const skills = await discoverSkillsCatalog({ homeDir, synaraBaseDir });
     const twins = skills.filter((skill) => skill.name === "twin");
-    expect(twins).toHaveLength(1);
+    expect(twins).toHaveLength(2);
     expect(twins[0]?.path).toContain(path.join("skills", "alpha"));
   });
 });
@@ -621,12 +658,12 @@ describe("mergeSkillsIntoCatalog", () => {
     scope,
   });
 
-  it("keeps provider-native entries and appends catalog-only entries", () => {
+  it("keeps separate native and catalog identities without merging names", () => {
     const merged = mergeSkillsIntoCatalog({
       native: [descriptor("shared", "codex-native")],
       catalog: [descriptor("Shared", "synara"), descriptor("extra", "synara")],
     });
-    expect(merged).toHaveLength(2);
+    expect(merged).toHaveLength(3);
     expect(merged.find((skill) => skill.name.toLowerCase() === "shared")?.scope).toBe(
       "codex-native",
     );

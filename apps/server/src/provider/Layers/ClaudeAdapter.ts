@@ -1,3 +1,4 @@
+import { loadManagedRoles, convertClaudeRole } from "../../agentSetup/roles";
 import { providerProcessPriorityEnabled } from "../../providerProcessPriority";
 import { claudeTurnResultUsage, type ClaudeResultUsageBaseline } from "../claudeResultUsage.ts";
 import { restoreClaudeImportedCopyDates } from "../claudeImportedCopyDates.ts";
@@ -1496,8 +1497,7 @@ export const buildEmbeddedClaudeSystemPromptAppend = (
     "Do not present the host app as Claude Code unless the user is explicitly asking about Claude Code.",
     "Treat the current working directory as the active workspace for the task.",
     "When the user asks about the current project, codebase, or repository, proactively inspect files in the current working directory before asking the user where to look.",
-    "When spawning subagents, set the Agent tool's `model` parameter and pick reasoning effort by choosing a worker-<tier> subagent type (worker-low, worker-medium, worker-high, worker-xhigh).",
-    "Honor explicit user instructions about a subagent's model or effort verbatim; otherwise match task complexity: mechanical work → haiku or worker-low, standard work → sonnet or worker-medium, hard reasoning → opus or fable with worker-high and above.",
+    "When spawning subagents, let roles inherit the current session model. Set the `model` parameter only when the user explicitly requests one, and honor personal model restrictions. Choose a worker-<tier> type (worker-low, worker-medium, worker-high, worker-xhigh) for an explicit effort request only when the active runtime supports that effort.",
     renderSynaraHarnessPolicy({
       gatewayControlAvailable,
       enableComputerControl,
@@ -7030,6 +7030,30 @@ function makeClaudeAdapter(options?: ClaudeAdapterLiveOptions) {
           ...(ultracode ? { ultracode: true } : {}),
         };
         const claudeSubagents = buildClaudeSdkSubagents();
+        const personalRoles = yield* Effect.tryPromise(() =>
+          loadManagedRoles(serverConfig.homeDir),
+        ).pipe(
+          Effect.mapError(
+            (cause) =>
+              new ProviderAdapterValidationError({
+                provider: "claudeAgent",
+                operation: "loadPersonalRoles",
+                issue: `Cannot load personal roles: ${String(cause)}`,
+              }),
+          ),
+        );
+        for (const role of personalRoles) {
+          const converted = yield* Effect.try({
+            try: () => convertClaudeRole(role),
+            catch: (cause) =>
+              new ProviderAdapterValidationError({
+                provider: "claudeAgent",
+                operation: "loadPersonalRoles",
+                issue: String(cause),
+              }),
+          });
+          claudeSubagents[role.id] = converted;
+        }
         const { claudeSdkEnv, snapshotSupported } =
           preflight ?? (yield* resolveClaudeStartPreflight(input));
         const failedStartupProcessOwner = failedStartupProcessOwners.get(threadId);

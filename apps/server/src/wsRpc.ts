@@ -1,3 +1,4 @@
+import { AgentSetupEngine } from "./agentSetup/engine";
 import { readEventLoopStatus } from "./eventLoopMonitor";
 import { makeGitActionRunner } from "./git/gitActionRunner";
 import { AgentGatewaySessionRegistry } from "./agentGateway/Services/AgentGatewaySessionRegistry";
@@ -170,7 +171,11 @@ import { ProjectionStateIncompleteError } from "./persistence/Errors";
 import { ProjectionSnapshotQuery } from "./orchestration/Services/ProjectionSnapshotQuery";
 import { shouldPublishThreadShellForEvent } from "./orchestration/threadShellEvents";
 import { ProviderDiscoveryService } from "./provider/Services/ProviderDiscoveryService";
-import { discoverSkillsCatalog, synaraSkillsDir } from "./provider/skillsCatalog";
+import {
+  discoverSkillsCatalog,
+  synaraSkillsDir,
+  invalidateSkillsCatalog,
+} from "./provider/skillsCatalog";
 import { recoverUnregisteredGitHubCheckout } from "./project/githubProjectRegistration";
 import { ProviderAdapterRegistry } from "./provider/Services/ProviderAdapterRegistry";
 import { ProviderHealth } from "./provider/Services/ProviderHealth";
@@ -499,6 +504,15 @@ const makeWsRpcHandlersLayer = () =>
       const projectAgentService = yield* ProjectAgentService;
       const projectAgentRepository = yield* ProjectAgentRepository;
       const config = yield* ServerConfig;
+      const agentSetup = new AgentSetupEngine(config.homeDir, [
+        { path: synaraSkillsDir(config.baseDir), owner: "synara" },
+      ]);
+      yield* Effect.acquireRelease(
+        Effect.tryPromise(() => agentSetup.watchDrift(() => invalidateSkillsCatalog())).pipe(
+          Effect.orElseSucceed(() => () => agentSetup.close()),
+        ),
+        (close) => Effect.sync(close),
+      );
       const devServerManager = yield* DevServerManager;
       const fileSystem = yield* FileSystem.FileSystem;
       const externalMcp = yield* ExternalMcpService;
@@ -2235,7 +2249,18 @@ const makeWsRpcHandlersLayer = () =>
         [WS_METHODS.serverGetSettings]: () =>
           rpcEffect(serverSettings.getSettingsView, "Failed to load server settings"),
         [WS_METHODS.serverUpdateSettings]: (input) =>
-          rpcEffect(serverSettings.updateSettingsView(input), "Failed to update server settings"),
+          rpcEffect(
+            Effect.gen(function* () {
+              const before = yield* serverSettings.getSettings;
+              const next = yield* serverSettings.updateSettingsView(input);
+              if (input.skills?.disabled !== undefined)
+                yield* Effect.tryPromise(() =>
+                  agentSetup.translateLegacyDisabled(before.skills.disabled, next.skills.disabled),
+                );
+              return next;
+            }),
+            "Failed to update server settings",
+          ),
         [WS_METHODS.serverRefreshProviders]: () =>
           rpcEffect(
             providerHealth.refresh.pipe(Effect.map((providers) => ({ providers }))),
@@ -2592,6 +2617,44 @@ const makeWsRpcHandlersLayer = () =>
           rpcEffect(providerDiscoveryService.listCommands(input), "Failed to list commands"),
         [WS_METHODS.providerListSkills]: (input) =>
           rpcEffect(providerDiscoveryService.listSkills(input), "Failed to list skills"),
+        [WS_METHODS.agentSetupInventory]: () =>
+          rpcEffect(
+            requireOwner.pipe(Effect.andThen(Effect.tryPromise(() => agentSetup.inventory()))),
+            "Failed to inventory agent setup",
+          ),
+        [WS_METHODS.agentSetupReadResource]: (input) =>
+          rpcEffect(
+            requireOwner.pipe(
+              Effect.andThen(Effect.tryPromise(() => agentSetup.readResource(input))),
+            ),
+            "Failed to read agent resource",
+          ),
+        [WS_METHODS.agentSetupSaveResource]: (input) =>
+          rpcEffect(
+            requireOwner.pipe(
+              Effect.andThen(Effect.tryPromise(() => agentSetup.saveResource(input))),
+            ),
+            "Failed to save agent resource",
+          ),
+        [WS_METHODS.agentSetupPreview]: () =>
+          rpcEffect(
+            requireOwner.pipe(Effect.andThen(Effect.tryPromise(() => agentSetup.preview()))),
+            "Failed to preview agent reconciliation",
+          ),
+        [WS_METHODS.agentSetupApply]: (input) =>
+          rpcEffect(
+            requireOwner.pipe(
+              Effect.andThen(Effect.tryPromise(() => agentSetup.apply(input.revision))),
+            ),
+            "Failed to apply agent reconciliation",
+          ),
+        [WS_METHODS.agentSetupRollback]: (input) =>
+          rpcEffect(
+            requireOwner.pipe(
+              Effect.andThen(Effect.tryPromise(() => agentSetup.rollback(input.backupId))),
+            ),
+            "Failed to roll back agent reconciliation",
+          ),
         [WS_METHODS.providerListSkillsCatalog]: (input) =>
           rpcEffect(
             Effect.tryPromise(() =>

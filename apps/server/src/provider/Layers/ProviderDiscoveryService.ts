@@ -42,6 +42,7 @@ import {
   writeProviderModelCatalogCache,
 } from "../providerModelCatalogCache.ts";
 import {
+  bindManagedSkillDescriptors,
   discoverSkillsCatalog,
   filterDisabledSkills,
   mergeSkillsIntoCatalog,
@@ -324,8 +325,11 @@ const make = Effect.gen(function* () {
           }).pipe(Effect.as([] as ProviderSkillDescriptor[])),
         ),
       );
+      const boundNative = yield* Effect.tryPromise(() =>
+        bindManagedSkillDescriptors(nativeResult?.skills ?? [], serverConfig.homeDir),
+      ).pipe(Effect.orElseSucceed(() => nativeResult?.skills ?? []));
       const merged = mergeSkillsIntoCatalog({
-        native: nativeResult?.skills ?? [],
+        native: boundNative,
         catalog: catalogSkills,
       });
       const settings = yield* serverSettings.getSettings.pipe(

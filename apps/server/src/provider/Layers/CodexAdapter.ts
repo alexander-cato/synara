@@ -1,3 +1,7 @@
+import {
+  buildExplicitModelDelegationPrompt,
+  parseAgentMentionInvocations,
+} from "@synara/shared/agentMentions";
 /**
  * CodexAdapterLive - Scoped live implementation for the Codex provider adapter.
  *
@@ -2152,7 +2156,7 @@ const makeCodexAdapter = (options?: CodexAdapterLiveOptions) =>
     const prepareCodexManagerTurnInput = (
       input: ProviderSendTurnInput,
       method: "turn/start" | "turn/steer",
-    ): Effect.Effect<CodexAppServerSendTurnInput, ProviderAdapterRequestError> =>
+    ): Effect.Effect<CodexAppServerSendTurnInput, ProviderAdapterError> =>
       Effect.gen(function* () {
         const nativeCodexAttachments = yield* Effect.forEach(
           filterProviderPromptImageAttachments(input.attachments),
@@ -2176,8 +2180,39 @@ const makeCodexAdapter = (options?: CodexAdapterLiveOptions) =>
           },
           { concurrency: 1 },
         );
+        let delegatedInput = input.input;
+        if (
+          parseAgentMentionInvocations(input.input ?? "", "codex").some(
+            (request) => request.definition.kind === "model",
+          )
+        ) {
+          const discovered = yield* Effect.tryPromise({
+            try: () =>
+              manager.listModels({
+                threadId: input.threadId,
+                ...(manager.getSessionCodexOptions(input.threadId)
+                  ? { codexOptions: manager.getSessionCodexOptions(input.threadId)! }
+                  : {}),
+              }),
+            catch: (cause) => toRequestError(input.threadId, "model/list", cause),
+          });
+          delegatedInput = yield* Effect.try({
+            try: () =>
+              buildExplicitModelDelegationPrompt(
+                input.input ?? "",
+                "codex",
+                discovered.error
+                  ? []
+                  : discovered.models.flatMap((model) => [
+                      model.slug,
+                      ...(model.resolvedModel ? [model.resolvedModel] : []),
+                    ]),
+              ),
+            catch: (cause) => toRequestError(input.threadId, method, cause),
+          });
+        }
         const composedInput = composeCodexInputWithFileAttachments({
-          input: input.input,
+          input: delegatedInput,
           attachments: input.attachments,
           attachmentsDir: serverConfig.attachmentsDir,
         });

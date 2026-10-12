@@ -1,3 +1,14 @@
+import {
+  AgentSetupInventoryInput,
+  AgentSetupInventory,
+  AgentResourceReadInput,
+  AgentResourceReadResult,
+  AgentResourceSaveInput,
+  AgentReconcilePlan,
+  AgentReconcileApplyInput,
+  AgentApplyResult,
+  AgentRollbackInput,
+} from "./agentSetup";
 import { Schema } from "effect";
 import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
@@ -1572,6 +1583,42 @@ export const WsProviderListSkillsRpc = Rpc.make(WS_METHODS.providerListSkills, {
   error: WsRpcError,
 });
 
+export const WsAgentSetupInventoryRpc = Rpc.make(WS_METHODS.agentSetupInventory, {
+  payload: AgentSetupInventoryInput,
+  success: AgentSetupInventory,
+  error: WsRpcError,
+});
+
+export const WsAgentSetupReadResourceRpc = Rpc.make(WS_METHODS.agentSetupReadResource, {
+  payload: AgentResourceReadInput,
+  success: AgentResourceReadResult,
+  error: WsRpcError,
+});
+
+export const WsAgentSetupSaveResourceRpc = Rpc.make(WS_METHODS.agentSetupSaveResource, {
+  payload: AgentResourceSaveInput,
+  success: AgentResourceReadResult,
+  error: WsRpcError,
+});
+
+export const WsAgentSetupPreviewRpc = Rpc.make(WS_METHODS.agentSetupPreview, {
+  payload: AgentSetupInventoryInput,
+  success: AgentReconcilePlan,
+  error: WsRpcError,
+});
+
+export const WsAgentSetupApplyRpc = Rpc.make(WS_METHODS.agentSetupApply, {
+  payload: AgentReconcileApplyInput,
+  success: AgentApplyResult,
+  error: WsRpcError,
+});
+
+export const WsAgentSetupRollbackRpc = Rpc.make(WS_METHODS.agentSetupRollback, {
+  payload: AgentRollbackInput,
+  success: AgentApplyResult,
+  error: WsRpcError,
+});
+
 export const WsProviderListSkillsCatalogRpc = Rpc.make(WS_METHODS.providerListSkillsCatalog, {
   payload: ProviderSkillsCatalogInput,
   success: ProviderSkillsCatalogResult,
@@ -2026,6 +2073,12 @@ export const WsFeatureRpcGroup = RpcGroup.make(
   WsProviderCompactThreadRpc,
   WsProviderListCommandsRpc,
   WsProviderListSkillsRpc,
+  WsAgentSetupInventoryRpc,
+  WsAgentSetupReadResourceRpc,
+  WsAgentSetupSaveResourceRpc,
+  WsAgentSetupPreviewRpc,
+  WsAgentSetupApplyRpc,
+  WsAgentSetupRollbackRpc,
   WsProviderListSkillsCatalogRpc,
   WsProviderListPluginsRpc,
   WsProviderReadPluginRpc,

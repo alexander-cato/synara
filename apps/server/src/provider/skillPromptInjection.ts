@@ -9,6 +9,7 @@ import * as fs from "node:fs/promises";
 import * as nodePath from "node:path";
 
 import type { ProviderKind, ProviderSkillReference } from "@synara/contracts";
+import { isWithin, walkSkillManifests } from "../agentSetup/files";
 
 // Per-skill cap keeps a single oversized SKILL.md from eating the turn budget.
 const MAX_INLINE_SKILL_CONTENT_CHARS = 24_000;
@@ -18,66 +19,33 @@ const INLINE_SKILLS_HEADER =
   "skill's instructions. File paths referenced inside a skill are relative to its " +
   '"dir" attribute.';
 
-const CROSS_PROVIDER_SKILL_DIR_NAMES = [
-  ".synara",
-  ".codex",
-  ".cursor",
-  ".claude",
-  ".agents",
-] as const;
-
-function pathSegments(path: string): Set<string> {
-  return new Set(
-    nodePath
-      .normalize(path)
-      .split(/[\\/]+/)
-      .map((segment) => segment.toLowerCase()),
-  );
-}
-
-export function shouldInlineSkillForProvider(provider: ProviderKind, skillPath: string): boolean {
-  const segments = pathSegments(skillPath);
-  switch (provider) {
-    case "antigravity":
-      return true;
-    case "codex":
-      // Codex loads .codex and .agents skills natively, plus ~/.synara/skills
-      // registered via skills/extraRoots/set. Only foreign provider roots
-      // need inline instructions alongside their structured skill reference.
-      return [".claude", ".cursor"].some((dir) => segments.has(dir));
-    case "cursor":
-      // cursor-agent natively scans .cursor/.agents/.claude/.codex skill roots;
-      // only Synara-owned paths need inlining.
-      return segments.has(".synara");
-    case "claudeAgent":
-      // Claude Code only loads skills from .claude/skills folders.
-      return !segments.has(".claude");
-    case "devin":
-      return !(
-        [".agents", ".claude", ".codeium", ".cognition", ".devin", ".windsurf"].some((dir) =>
-          segments.has(dir),
-        ) ||
-        ((segments.has(".config") || (segments.has("appdata") && segments.has("roaming"))) &&
-          (segments.has("devin") || segments.has("cognition")))
-      );
-    case "pi":
-      // Pi loads its own skill set; anything resolved from a cross-provider
-      // folder is portable and must be inlined.
-      return CROSS_PROVIDER_SKILL_DIR_NAMES.some((dir) => segments.has(dir));
-    default:
-      // Antigravity/Grok/Droid/OpenCode have no native skill support.
-      return true;
-  }
+// Loading is a client capability supplied by the adapter, never inferred from
+// a provider-looking segment embedded somewhere in a filename.
+export function shouldInlineSkillForProvider(
+  _provider: ProviderKind,
+  skillPath: string,
+  nativeRoots: readonly string[] = [],
+): boolean {
+  return !nativeRoots.some((root) => isWithin(nodePath.resolve(root), nodePath.resolve(skillPath)));
 }
 
 export async function buildInlineSkillInstructions(input: {
   readonly provider: ProviderKind;
   readonly skills: ReadonlyArray<ProviderSkillReference>;
   readonly maxChars: number;
+  readonly nativeSkillRoots?: readonly string[];
 }): Promise<string> {
-  const inlineSkills = input.skills.filter((skill) =>
-    shouldInlineSkillForProvider(input.provider, skill.path),
-  );
+  const nativePaths = new Set<string>();
+  for (const root of input.nativeSkillRoots ?? []) {
+    for (const manifest of await walkSkillManifests(root)) {
+      nativePaths.add(await fs.realpath(manifest).catch(() => manifest));
+    }
+  }
+  const inlineSkills: ProviderSkillReference[] = [];
+  for (const skill of input.skills) {
+    const actual = await fs.realpath(skill.path).catch(() => skill.path);
+    if (!nativePaths.has(actual)) inlineSkills.push(skill);
+  }
   if (inlineSkills.length === 0 || input.maxChars <= 0) {
     return "";
   }
