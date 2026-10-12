@@ -821,6 +821,14 @@ export function createWsNativeApi(): NativeApi {
         transport.request(WS_METHODS.statsGetProfileTokenStats, input),
       getRecap: (input) => transport.request(WS_METHODS.statsGetRecap, input),
     },
+    agentSetup: {
+      inventory: (input) => transport.request(WS_METHODS.agentSetupInventory, input),
+      readResource: (input) => transport.request(WS_METHODS.agentSetupReadResource, input),
+      saveResource: (input) => transport.request(WS_METHODS.agentSetupSaveResource, input),
+      preview: (input) => transport.request(WS_METHODS.agentSetupPreview, input),
+      apply: (input) => transport.request(WS_METHODS.agentSetupApply, input),
+      rollback: (input) => transport.request(WS_METHODS.agentSetupRollback, input),
+    },
     provider: {
       getComposerCapabilities: (input) =>
         transport.request(WS_METHODS.providerGetComposerCapabilities, input),

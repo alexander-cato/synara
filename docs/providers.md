@@ -24,6 +24,8 @@ provider settings in your installed Synara version as the authoritative list for
 
 ## What Synara manages
 
+Personal instructions, skills, roles, and client exports are managed through [Agent setup](agent-setup.md). Portable sources remain separate from each provider's native account and runtime settings.
+
 Synara provides the shared operating surface around each provider:
 
 - Project and task ownership

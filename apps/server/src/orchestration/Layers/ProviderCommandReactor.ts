@@ -1,3 +1,4 @@
+import { providerNativeSkillRoots } from "../../provider/skillsCatalog";
 import { appendAppSnapPromptContext } from "../../provider/appSnapPromptContext.ts";
 import { isServerBetaFeatureEnabled } from "../../betaFeatureGate";
 import { computerActivationMetadata } from "../../computer/computerActivation.ts";
@@ -3043,6 +3044,7 @@ const make = Effect.gen(function* () {
     if (!thread) {
       return;
     }
+    const skillWorkspaceCwd = yield* resolveProjectedThreadWorkspaceCwd(thread);
     const projectContextPacket = yield* (
       Option.isSome(projectAgentService)
         ? projectAgentService.value.formatContextPacketForTurn(input.threadId)
@@ -3111,6 +3113,12 @@ const make = Effect.gen(function* () {
           ? yield* Effect.tryPromise(() =>
               buildInlineSkillInstructions({
                 provider: steerProvider,
+                nativeSkillRoots: providerNativeSkillRoots({
+                  provider: steerProvider,
+                  homeDir: serverConfig.homeDir,
+                  synaraBaseDir: serverConfig.baseDir,
+                  cwd: skillWorkspaceCwd ?? null,
+                }).map((root) => root.path),
                 skills: input.skills ?? [],
                 maxChars: Math.max(
                   0,
@@ -3574,6 +3582,12 @@ const make = Effect.gen(function* () {
         ? yield* Effect.tryPromise(() =>
             buildInlineSkillInstructions({
               provider: selectedProvider as ProviderKind,
+              nativeSkillRoots: providerNativeSkillRoots({
+                provider: selectedProvider as ProviderKind,
+                homeDir: serverConfig.homeDir,
+                synaraBaseDir: serverConfig.baseDir,
+                cwd: skillWorkspaceCwd ?? null,
+              }).map((root) => root.path),
               skills: input.skills ?? [],
               maxChars: Math.max(
                 0,

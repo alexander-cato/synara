@@ -1,3 +1,14 @@
+import {
+  AgentSetupInventoryInput,
+  AgentSetupInventory,
+  AgentResourceReadInput,
+  AgentResourceReadResult,
+  AgentResourceSaveInput,
+  AgentReconcilePlan,
+  AgentReconcileApplyInput,
+  AgentApplyResult,
+  AgentRollbackInput,
+} from "./agentSetup";
 import { Schema } from "effect";
 import type {
   LoadProjectImportHistoryInput,
@@ -1339,6 +1350,14 @@ export interface NativeApi {
       input: StatsGetProfileTokenStatsInput,
     ) => Promise<StatsGetProfileTokenStatsResult>;
     getRecap: (input: StatsGetRecapInput) => Promise<StatsGetRecapResult>;
+  };
+  agentSetup: {
+    inventory: (input: typeof AgentSetupInventoryInput.Type) => Promise<AgentSetupInventory>;
+    readResource: (input: typeof AgentResourceReadInput.Type) => Promise<AgentResourceReadResult>;
+    saveResource: (input: typeof AgentResourceSaveInput.Type) => Promise<AgentResourceReadResult>;
+    preview: (input: typeof AgentSetupInventoryInput.Type) => Promise<AgentReconcilePlan>;
+    apply: (input: typeof AgentReconcileApplyInput.Type) => Promise<AgentApplyResult>;
+    rollback: (input: typeof AgentRollbackInput.Type) => Promise<AgentApplyResult>;
   };
   provider: {
     getComposerCapabilities: (

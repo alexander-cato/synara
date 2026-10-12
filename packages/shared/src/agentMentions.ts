@@ -151,3 +151,30 @@ export function buildClaudeSubagentPrompt(text: string): {
     invocations,
   };
 }
+
+export function buildExplicitModelDelegationPrompt(
+  text: string,
+  provider: ProviderKind,
+  availableModels: readonly string[],
+): string {
+  const requests = parseAgentMentionInvocations(text, provider).filter(
+    (invocation) => invocation.definition.kind === "model",
+  );
+  for (const request of requests) {
+    if (
+      request.definition.kind === "model" &&
+      !availableModels.includes(request.definition.model)
+    ) {
+      throw new Error(
+        `Requested model ${request.definition.model} is unavailable in current discovery. No model was substituted.`,
+      );
+    }
+  }
+  if (!requests.length) return text;
+  const directives = requests.map((request) =>
+    request.definition.kind === "model"
+      ? `Use exactly ${JSON.stringify(request.definition.model)} for the delegated task: ${request.task}`
+      : "",
+  );
+  return `${text}\n\nExplicit model requests, verified against current client discovery:\n${directives.join("\n")}\nIf the requested model cannot be used, report the failure and stop that delegation; never choose a substitute.`;
+}

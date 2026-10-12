@@ -65,6 +65,9 @@ import {
   Stream,
 } from "effect";
 import { nonEmptyTrimmed } from "@synara/shared/text";
+import { parseAgentMentionInvocations } from "@synara/shared/agentMentions";
+import { ServerConfig } from "../../config";
+import { assertPersonalModelAllowed } from "../../agentSetup/targeting";
 import { computerApprovalGate } from "../../computer/ComputerApprovalGate.ts";
 
 import {
@@ -898,6 +901,27 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
     const registry = yield* ProviderAdapterRegistry;
     const directory = yield* ProviderSessionDirectory;
     const serverSettings = yield* ServerSettingsService;
+    const setupConfig = Option.getOrUndefined(yield* Effect.serviceOption(ServerConfig));
+    const enforcePersonalTargeting = (
+      model: string | undefined,
+      text: string | undefined,
+      provider: ProviderKind,
+      operation: string,
+    ) =>
+      Effect.gen(function* () {
+        if (!setupConfig) return;
+        const requested = text
+          ? parseAgentMentionInvocations(text, provider).flatMap((invocation) =>
+              invocation.definition.kind === "model" ? [invocation.definition.model] : [],
+            )
+          : [];
+        for (const selection of [model, ...requested])
+          if (selection)
+            yield* Effect.tryPromise({
+              try: () => assertPersonalModelAllowed(setupConfig.homeDir, selection),
+              catch: (cause) => new ProviderValidationError({ operation, issue: String(cause) }),
+            });
+      });
     const secretStore = yield* ServerSecretStore;
     const credentialsFingerprintKey = yield* secretStore.getOrCreateRandom(
       PROVIDER_OPTIONS_FINGERPRINT_HMAC_SECRET,
@@ -2907,6 +2931,12 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
           threadId,
           provider: resolvedProvider,
         };
+        yield* enforcePersonalTargeting(
+          input.modelSelection?.model,
+          undefined,
+          resolvedProvider,
+          "ProviderService.startSession",
+        );
         // Reject disabled providers before waiting on lifecycle work, then
         // check again immediately before spawning in case settings changed.
         yield* ensureProviderEnabled(resolvedProvider, "ProviderService.startSession");
@@ -3975,6 +4005,14 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
               routed.adapter.provider,
               routed.providerInstanceId,
             );
+            const binding = Option.getOrUndefined(yield* directory.getBinding(input.threadId));
+            yield* enforcePersonalTargeting(
+              routedModelSelection?.model ??
+                (binding ? readPersistedModelSelection(binding.runtimePayload)?.model : undefined),
+              input.input,
+              routed.adapter.provider,
+              "ProviderService.sendTurn",
+            );
             const routedInput = {
               ...input,
               ...(routedModelSelection !== undefined
@@ -4075,6 +4113,14 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
                 ? { modelSelection: routedModelSelection }
                 : {}),
             };
+            const binding = Option.getOrUndefined(yield* directory.getBinding(input.threadId));
+            yield* enforcePersonalTargeting(
+              routedModelSelection?.model ??
+                (binding ? readPersistedModelSelection(binding.runtimePayload)?.model : undefined),
+              input.input,
+              routed.adapter.provider,
+              "ProviderService.steerTurn",
+            );
             const turn = yield* options
               ? routed.adapter.steerTurn(routedInput, options)
               : routed.adapter.steerTurn(routedInput);

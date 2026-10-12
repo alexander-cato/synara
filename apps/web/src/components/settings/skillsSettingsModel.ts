@@ -37,6 +37,7 @@ export interface SettingsSkillSection {
 const SHARED_SKILLS_SECTION = "shared";
 const PERSONAL_ORIGIN = "personal";
 export const ORIGIN_SECTION_ORDER = [
+  "agents",
   "synara",
   "codex",
   "claude",
@@ -48,7 +49,12 @@ export const ORIGIN_SECTION_ORDER = [
   "pi",
   "devin",
   "omp",
-  "agents",
+  "codeg",
+  "copilot",
+  "auggie",
+  "junie",
+  "gemini",
+  "goose",
   "project",
 ] as const;
 export function skillOriginInfo(scope: string | undefined): SkillOriginInfo {
@@ -137,7 +143,9 @@ export function buildSettingsSkillGroups(
 ): SettingsSkillGroup[] {
   const groups = new Map<string, SettingsSkillSource[]>();
   for (const skill of skills) {
-    const key = settingsSkillNameKey(skill.name);
+    const key =
+      skill.resourceId ??
+      `${settingsSkillNameKey(skill.name)}:${skill.packageHash ?? skill.canonicalPath ?? skill.path}`;
     const origin = skill.scope ?? PERSONAL_ORIGIN;
     const source: SettingsSkillSource = {
       skill,

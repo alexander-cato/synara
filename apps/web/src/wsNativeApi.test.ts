@@ -164,6 +164,26 @@ afterEach(() => {
 });
 
 describe("wsNativeApi", () => {
+  it("sends source and exact-preview revisions unchanged through the agent setup API", async () => {
+    const { createWsNativeApi } = await import("./wsNativeApi");
+    const api = createWsNativeApi();
+    const save = {
+      id: "skill:example",
+      file: "scripts/run.sh",
+      content: "echo updated",
+      expectedRevision: "opened-package-hash",
+    };
+    await api.agentSetup.saveResource(save);
+    expect(requestMock).toHaveBeenLastCalledWith(WS_METHODS.agentSetupSaveResource, save);
+    await api.agentSetup.apply({ revision: "exact-preview-hash" });
+    expect(requestMock).toHaveBeenLastCalledWith(WS_METHODS.agentSetupApply, {
+      revision: "exact-preview-hash",
+    });
+    await api.agentSetup.rollback({ backupId: "journal-id" });
+    expect(requestMock).toHaveBeenLastCalledWith(WS_METHODS.agentSetupRollback, {
+      backupId: "journal-id",
+    });
+  });
   it("forwards exhausted shell failures and removes unsubscribed listeners", async () => {
     const { createWsNativeApi, onShellStreamFailure } = await import("./wsNativeApi");
     createWsNativeApi();

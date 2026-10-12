@@ -9,6 +9,7 @@
   },
   "bin": {
     "synara": "dist/index.mjs",
+    "synara-agent-setup": "dist/agentSetupCli.mjs",
     "synara-restore-migration-backup": "dist/restoreMigrationBackup.mjs"
   },
   "files": [
@@ -38,6 +39,7 @@
     "@pierre/diffs": "^1.2.12",
     "@xterm/headless": "^6.0.0",
     "effect": "catalog:",
+    "jsonc-parser": "3.3.1",
     "node-pty": "^1.1.0",
     "open": "^10.1.0",
     "smol-toml": "^1.7.0",

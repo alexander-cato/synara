@@ -2,8 +2,8 @@
 // Purpose: Generic Agent Skill discovery primitives (frontmatter parsing, SKILL.md
 //          walking) plus the unified cross-provider skills catalog backing Synara
 //          portable skills. Aggregates `~/.synara/skills` with every provider-native
-//          skills folder, deduping by name with provider-native copies winning for
-//          the active provider.
+//          skills folder, retaining distinct resources and binding managed copies
+//          to their portable source identities.
 // Layer: Server provider discovery helper
 // Exports: parseSkillFrontmatter, collectSkillsFromRoots, discoverSkillsCatalog,
 //          mergeSkillsIntoCatalog, filterDisabledSkills, ensureSynaraSkillsDir
@@ -13,6 +13,7 @@ import * as nodePath from "node:path";
 
 import type { ProviderKind, ProviderSkillDescriptor } from "@synara/contracts";
 import YAML from "yaml";
+import { digest, hashPackage, walkSkillManifests } from "../agentSetup/files";
 import { discoverClaudePluginSkillRoots } from "./claudePluginSkills.ts";
 
 type FrontmatterValue = string | boolean;
@@ -153,116 +154,11 @@ export function ancestorsFromDeepest(cwd: string): string[] {
   }
 }
 
-async function readdirOrEmpty(path: string): Promise<import("node:fs").Dirent[]> {
-  try {
-    return await fs.readdir(path, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-}
-
-async function isWalkableSkillDirectory(
-  parentPath: string,
-  dirent: import("node:fs").Dirent,
-  followSymlinks: boolean,
-): Promise<boolean> {
-  if (dirent.isDirectory()) {
-    return true;
-  }
-  if (!followSymlinks || !dirent.isSymbolicLink()) {
-    return false;
-  }
-  try {
-    return (await fs.stat(nodePath.join(parentPath, dirent.name))).isDirectory();
-  } catch {
-    return false;
-  }
-}
-
-// Skills may be nested one namespace deep, e.g. `.cursor/skills/skills-sh/find-skills`.
-// Subdirectories are visited concurrently but results are flattened in sorted name
-// order so name-dedup always picks the same winner across runs. Provider skill
-// folders may be symlinked, so directory checks intentionally follow symlinks.
-async function isReadableMarkdownFile(
-  parentPath: string,
-  dirent: import("node:fs").Dirent,
-): Promise<boolean> {
-  if (!dirent.name.toLowerCase().endsWith(".md") || dirent.name.toLowerCase() === "skill.md") {
-    return false;
-  }
-  if (dirent.isFile()) {
-    return true;
-  }
-  if (!dirent.isSymbolicLink()) {
-    return false;
-  }
-  try {
-    return (await fs.stat(nodePath.join(parentPath, dirent.name))).isFile();
-  } catch {
-    return false;
-  }
-}
-
 export async function collectSkillMarkdownPaths(
   rootPath: string,
-  options?: {
-    readonly includeMarkdownFiles?: boolean;
-    readonly followSymlinks?: boolean;
-  },
+  options?: { readonly includeMarkdownFiles?: boolean; readonly followSymlinks?: boolean },
 ): Promise<string[]> {
-  async function visit(dir: string, depth: number): Promise<string[]> {
-    const skillPath = nodePath.join(dir, "SKILL.md");
-    try {
-      const stat =
-        options?.followSymlinks === false ? await fs.lstat(skillPath) : await fs.stat(skillPath);
-      if (stat.isFile()) {
-        return [skillPath];
-      }
-    } catch {
-      // Keep walking; this directory may be a namespace rather than a skill.
-    }
-
-    if (depth >= 2) {
-      return [];
-    }
-
-    const dirents = await readdirOrEmpty(dir);
-    const directMarkdownFiles =
-      depth === 0 && options?.includeMarkdownFiles
-        ? (
-            await Promise.all(
-              dirents.map(async (dirent) => ({
-                name: dirent.name,
-                isMarkdownFile: await isReadableMarkdownFile(dir, dirent),
-              })),
-            )
-          )
-            .filter((entry) => entry.isMarkdownFile)
-            .map((entry) => nodePath.join(dir, entry.name))
-            .sort()
-        : [];
-    const subdirNames = (
-      await Promise.all(
-        dirents.map(async (dirent) => ({
-          name: dirent.name,
-          isDirectory: await isWalkableSkillDirectory(
-            dir,
-            dirent,
-            options?.followSymlinks !== false,
-          ),
-        })),
-      )
-    )
-      .filter((entry) => entry.isDirectory)
-      .map((entry) => entry.name)
-      .sort();
-    const nested = await Promise.all(
-      subdirNames.map((name) => visit(nodePath.join(dir, name), depth + 1)),
-    );
-    return [...directMarkdownFiles, ...nested.flat()];
-  }
-
-  return visit(rootPath, 0);
+  return walkSkillManifests(rootPath, options);
 }
 
 export async function readSkillDescriptor(input: {
@@ -298,7 +194,16 @@ export async function readSkillDescriptor(input: {
   const disabled =
     readBooleanField(frontmatter, ["disable-model-invocation", "disableModelInvocation"]) === true;
 
+  const canonicalPath = await fs.realpath(input.skillPath).catch(() => input.skillPath);
+  const packageHash = await hashPackage(
+    skillFilename.toLowerCase() === "skill.md" ? nodePath.dirname(canonicalPath) : canonicalPath,
+  )
+    .then((result) => result.hash)
+    .catch(() => undefined);
   return {
+    resourceId: `external:${digest(skillFilename.toLowerCase() === "skill.md" ? nodePath.dirname(canonicalPath) : canonicalPath).slice(0, 24)}`,
+    canonicalPath,
+    ...(packageHash ? { packageHash } : {}),
     name,
     ...(description ? { description } : {}),
     path: input.skillPath,
@@ -345,23 +250,21 @@ async function collectSkillDescriptorsFromRoots(
       return descriptors.filter((skill) => skill !== null);
     }),
   );
-  return skillsPerRoot.flat();
+  const identities = new Set<string>();
+  return skillsPerRoot.flat().filter((skill) => {
+    const identity = `${skill.canonicalPath ?? skill.path}:${skill.name.includes(":") ? skill.name : ""}`;
+    if (identities.has(identity)) return false;
+    identities.add(identity);
+    return true;
+  });
 }
 
-// Scans all roots concurrently, then dedupes by name in root order so earlier
-// roots keep precedence. Within a root, SKILL.md path order is preserved.
+// Scans roots concurrently, retaining distinct packages in root order.
 export async function collectSkillsFromRoots(
   roots: ReadonlyArray<SkillRoot>,
 ): Promise<ProviderSkillDescriptor[]> {
   const allSkills = await collectSkillDescriptorsFromRoots(roots);
-  const byName = new Map<string, ProviderSkillDescriptor>();
-  for (const skill of allSkills) {
-    const key = skillNameKey(skill.name);
-    if (!byName.has(key)) {
-      byName.set(key, skill);
-    }
-  }
-  return [...byName.values()];
+  return allSkills;
 }
 
 // ── Unified cross-provider catalog ───────────────────────────────────
@@ -372,9 +275,9 @@ export interface SkillsCatalogDiscoveryInput {
   readonly homeDir: string;
   /** Synara base dir (usually `~/.synara`); skills live in `{base}/skills`. */
   readonly synaraBaseDir: string;
-  /** Provider whose native copies should win when the same skill exists in several roots. */
+  /** Provider whose native locations should be scanned first. */
   readonly provider?: ProviderKind | null;
-  /** Settings needs every origin; composer/provider pickers keep one winner by name. */
+  /** Settings also needs disabled resources; picker discovery hides them. */
   readonly includeDuplicateOrigins?: boolean;
   /** Bypass the short-lived discovery cache. */
   readonly forceReload?: boolean;
@@ -399,6 +302,13 @@ const HOME_ORIGIN_ORDER = [
   "devin",
   "omp",
   "agents",
+  "codeg",
+  "antigravity",
+  "copilot",
+  "auggie",
+  "junie",
+  "gemini",
+  "goose",
 ] as const;
 export type SkillsCatalogOrigin = (typeof HOME_ORIGIN_ORDER)[number] | "project";
 
@@ -416,11 +326,13 @@ const skillsCatalogCache = new Map<string, SkillsCatalogCacheEntry>();
 const skillsCatalogInflight = new Map<string, Promise<ReadonlyArray<ProviderSkillDescriptor>>>();
 const ensuredSynaraSkillsDirs = new Set<string>();
 
-export function clearSkillsCatalogCacheForTests(): void {
+export function invalidateSkillsCatalog(): void {
   skillsCatalogCache.clear();
   skillsCatalogInflight.clear();
   ensuredSynaraSkillsDirs.clear();
 }
+
+export const clearSkillsCatalogCacheForTests = invalidateSkillsCatalog;
 
 export function synaraSkillsDir(synaraBaseDir: string): string {
   return nodePath.join(synaraBaseDir, "skills");
@@ -512,6 +424,38 @@ const SKILL_ORIGIN_ROOTS = {
     ],
     projectRootNames: [".omp"],
   },
+  codeg: {
+    homeRoots: (input) => [nodePath.join(input.homeDir, ".codeg", "skills")],
+    projectRootNames: [".codeg"],
+  },
+  antigravity: {
+    homeRoots: (input) => [
+      nodePath.join(input.homeDir, ".gemini", "config", "skills"),
+      nodePath.join(input.homeDir, ".gemini", "antigravity-cli", "skills"),
+      nodePath.join(input.homeDir, ".gemini", "antigravity", "skills"),
+    ],
+    projectRootNames: [],
+  },
+  copilot: {
+    homeRoots: (input) => [nodePath.join(input.homeDir, ".copilot", "skills")],
+    projectRootNames: [".github"],
+  },
+  auggie: {
+    homeRoots: (input) => [nodePath.join(input.homeDir, ".augment", "skills")],
+    projectRootNames: [".augment"],
+  },
+  junie: {
+    homeRoots: (input) => [nodePath.join(input.homeDir, ".junie", "agent-skills")],
+    projectRootNames: [],
+  },
+  gemini: {
+    homeRoots: (input) => [nodePath.join(input.homeDir, ".gemini", "skills")],
+    projectRootNames: [".gemini"],
+  },
+  goose: {
+    homeRoots: (input) => [nodePath.join(input.homeDir, ".config", "goose", "skills")],
+    projectRootNames: [],
+  },
   agents: {
     homeRoots: (input) => [nodePath.join(input.homeDir, ".agents", "skills")],
     projectRootNames: [".agents"],
@@ -522,7 +466,7 @@ const PROVIDER_SKILL_ORIGIN_PREFERENCES = {
   codex: ["codex", "agents"],
   claudeAgent: ["claude"],
   cursor: ["cursor", "agents", "claude", "codex"],
-  antigravity: ["agents"],
+  antigravity: ["agents", "antigravity"],
   grok: ["grok", "claude", "agents"],
   droid: ["factory", "agents", "claude", "codex"],
   opencode: ["opencode", "claude", "agents"],
@@ -630,6 +574,98 @@ export function providerNativeSkillRoots(input: SkillsCatalogRootInput): SkillRo
   return rootsForOrderedOrigins(input, orderedOriginsForProvider(input.provider, false, false));
 }
 
+export async function bindManagedSkillDescriptors(
+  skills: readonly ProviderSkillDescriptor[],
+  homeDir: string,
+  includeDisabled = false,
+): Promise<ProviderSkillDescriptor[]> {
+  let registry: {
+    resources?: Array<{
+      id: string;
+      kind?: string;
+      source: string;
+      name?: string;
+      enabled: boolean;
+      ownership: string;
+    }>;
+  };
+  try {
+    registry = JSON.parse(await fs.readFile(nodePath.join(homeDir, ".agents/setup.json"), "utf8"));
+  } catch {
+    return [...skills];
+  }
+  const deployments: Array<{ path: string; resourceId: string }> = await fs
+    .readFile(nodePath.join(homeDir, ".agents/.state/deployments.json"), "utf8")
+    .then((content) => JSON.parse(content))
+    .catch(() => []);
+  const bindings = new Map<
+    string,
+    { id: string; enabled: boolean; ownership: string; descriptor: ProviderSkillDescriptor | null }
+  >();
+  for (const resource of registry.resources ?? []) {
+    if (resource.ownership === "archive" || (resource.kind && resource.kind !== "skill")) continue;
+    const source = resource.source.startsWith("~/")
+      ? nodePath.join(homeDir, resource.source.slice(2))
+      : resource.source;
+    const skillPath = nodePath.join(source, "SKILL.md");
+    const descriptor = resource.ownership.startsWith("managed")
+      ? await readSkillDescriptor({ skillPath, scope: "agents" })
+      : null;
+    const binding = {
+      id: resource.id,
+      enabled: resource.enabled,
+      ownership: resource.ownership,
+      descriptor,
+    };
+    bindings.set(await fs.realpath(skillPath).catch(() => source), binding);
+    for (const deployment of deployments.filter(
+      (deployment) => deployment.resourceId === resource.id,
+    )) {
+      bindings.set(
+        await fs.realpath(nodePath.join(deployment.path, "SKILL.md")).catch(() => ""),
+        binding,
+      );
+    }
+  }
+  const result: ProviderSkillDescriptor[] = [];
+  for (const skill of skills) {
+    const canonicalPath =
+      skill.canonicalPath ?? (await fs.realpath(skill.path).catch(() => skill.path));
+    const binding = bindings.get(canonicalPath);
+    if (binding && !binding.enabled && !includeDisabled) continue;
+    const source = binding?.descriptor;
+    result.push(
+      binding && source && binding.ownership.startsWith("managed")
+        ? {
+            ...source,
+            resourceId: binding.id,
+            path: source.canonicalPath ?? source.path,
+            ownership: binding.ownership.startsWith("managed") ? "managed-shared" : "external",
+            enabled: binding.enabled && source.enabled,
+            ...(binding.ownership.startsWith("managed") && source.packageHash !== skill.packageHash
+              ? {
+                  diagnostics: [
+                    "Canonical source differs from the native export; review the pending reconciliation.",
+                  ],
+                }
+              : {}),
+          }
+        : {
+            ...skill,
+            canonicalPath,
+            ...(binding
+              ? {
+                  resourceId: binding.id,
+                  ownership: "external",
+                  enabled: binding.enabled && skill.enabled,
+                }
+              : {}),
+          },
+    );
+  }
+  return result;
+}
+
 export async function discoverSkillsCatalog(
   input: SkillsCatalogDiscoveryInput,
 ): Promise<ProviderSkillDescriptor[]> {
@@ -663,9 +699,13 @@ export async function discoverSkillsCatalog(
         ...(input.cwd ? { cwd: input.cwd } : {}),
       })),
     ];
-    const skills = input.includeDuplicateOrigins
-      ? await collectSkillDescriptorsFromRoots(roots)
-      : await collectSkillsFromRoots(roots);
+    let skills = await collectSkillDescriptorsFromRoots(roots);
+    skills = await bindManagedSkillDescriptors(
+      skills,
+      input.homeDir,
+      input.includeDuplicateOrigins ?? false,
+    );
+    skills = mergeSkillsIntoCatalog({ native: [], catalog: skills });
 
     skillsCatalogCache.delete(cacheKey);
     skillsCatalogCache.set(cacheKey, { at: Date.now(), skills });
@@ -687,19 +727,44 @@ export async function discoverSkillsCatalog(
   }
 }
 
-// Provider-native discovery results win on name conflicts; catalog entries fill the gaps.
+// Preserve distinct same-name resources; collapse aliases of one managed identity.
 export function mergeSkillsIntoCatalog(input: {
   readonly native: ReadonlyArray<ProviderSkillDescriptor>;
   readonly catalog: ReadonlyArray<ProviderSkillDescriptor>;
 }): ProviderSkillDescriptor[] {
-  const byName = new Map<string, ProviderSkillDescriptor>();
-  for (const skill of [...input.native, ...input.catalog]) {
-    const key = skillNameKey(skill.name);
-    if (!byName.has(key)) {
-      byName.set(key, skill);
-    }
+  const byIdentity = new Map<string, ProviderSkillDescriptor>();
+  // Managed shared references resolve to their canonical source independently of the model.
+  const all = [
+    ...input.catalog.filter((skill) => skill.ownership === "managed-shared"),
+    ...input.native,
+    ...input.catalog,
+  ];
+  for (const skill of all) {
+    const binding = input.catalog.find(
+      (item) =>
+        item.ownership === "managed-shared" &&
+        (item.canonicalPath === skill.canonicalPath || item.path === skill.path),
+    );
+    const key = binding?.resourceId ?? skill.resourceId ?? skill.canonicalPath ?? skill.path;
+    if (!byIdentity.has(key)) byIdentity.set(key, skill);
   }
-  return [...byName.values()];
+  const skills = [...byIdentity.values()];
+  return skills.map((skill) => {
+    const conflicts = skills.filter(
+      (other) =>
+        other !== skill &&
+        skillNameKey(other.name) === skillNameKey(skill.name) &&
+        other.packageHash !== skill.packageHash,
+    );
+    return conflicts.length
+      ? {
+          ...skill,
+          diagnostics: [
+            `Same-name resources have different or unverified package contents: ${conflicts.map((other) => other.path).join(", ")}`,
+          ],
+        }
+      : skill;
+  });
 }
 
 export function filterDisabledSkills(
@@ -710,5 +775,9 @@ export function filterDisabledSkills(
     return [...skills];
   }
   const disabled = new Set(disabledNames.map((name) => skillNameKey(name)));
-  return skills.filter((skill) => !disabled.has(skillNameKey(skill.name)));
+  return skills.filter(
+    (skill) =>
+      !disabled.has(skillNameKey(skill.name)) &&
+      !disabled.has(skillNameKey(skill.resourceId ?? "")),
+  );
 }

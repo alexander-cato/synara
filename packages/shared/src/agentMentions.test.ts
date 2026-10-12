@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildClaudeSubagentPrompt, parseAgentMentionInvocations } from "./agentMentions";
+import {
+  buildExplicitModelDelegationPrompt,
+  buildClaudeSubagentPrompt,
+  parseAgentMentionInvocations,
+} from "./agentMentions";
 
 describe("parseAgentMentionInvocations", () => {
   it("parses Codex inline subagent syntax", () => {
@@ -66,5 +70,22 @@ describe("buildClaudeSubagentPrompt", () => {
     expect(rewritten.prompt).toContain("check for regressions");
     expect(rewritten.prompt).toContain('Use the "explore" agent for this task:');
     expect(rewritten.prompt).toContain("Original user prompt:");
+  });
+});
+
+describe("explicit model requests", () => {
+  it("retains the exact named model and refuses an unavailable model", () => {
+    const prompt = "Please @spark(check the regression)";
+    expect(buildExplicitModelDelegationPrompt(prompt, "codex", ["gpt-5.3-codex-spark"])).toContain(
+      'Use exactly "gpt-5.3-codex-spark"',
+    );
+    expect(() => buildExplicitModelDelegationPrompt(prompt, "codex", ["gpt-5.5"])).toThrow(
+      "No model was substituted",
+    );
+  });
+  it("leaves generic inherited-model roles unchanged", () => {
+    expect(buildExplicitModelDelegationPrompt("@review(check the change)", "claudeAgent", [])).toBe(
+      "@review(check the change)",
+    );
   });
 });

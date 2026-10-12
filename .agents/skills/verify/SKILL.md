@@ -35,9 +35,11 @@ Then open http://localhost:5899/.
 - To see diffs: select a git workspace with uncommitted changes, then click the **+N −N** toggle in the top-right chat header — it opens the DiffPanel (working-tree diff). No project/thread needed.
 - Server tests: don't run the suite from a checkout under `/private/tmp` — `localImageRoute.test.ts` fails there (its "outside the workspace" fixture lands in an allowed temp root). It passes from a normal checkout and on CI.
 
-## Playwright driving
+## Browser verification
 
-Chrome extension may be unavailable; `playwright` is a devDependency of `apps/web` — import it by absolute path from `apps/web/node_modules/playwright/index.mjs` in a scratch script.
+When running inside Synara, use its canonical `browser_*` tools for the shared browser pane. Verify the target with `browser_status` and `browser_tabs`, open the isolated UI with `browser_open`, inspect and act with `browser_run`, and capture a proof screenshot with `browser_screenshot` after the behavior is visible. Do not substitute an OS browser or a separate Playwright session for Synara browser evidence.
+
+For automated repository tests outside that pane, use the existing browser test runner and its isolated fixtures.
 
 ## Real provider feature verification
 

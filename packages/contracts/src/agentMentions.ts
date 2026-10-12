@@ -125,7 +125,6 @@ const CLAUDE_AGENT_MENTION_ALIASES: Record<string, ClaudeSubagentAliasDefinition
     prompt:
       "You are a focused codebase exploration specialist. Search broadly, gather the most relevant findings, and return a concise summary with the key files, evidence, and risks. Do not make code changes.",
     tools: ["Read", "Grep", "Glob"],
-    model: "haiku",
   },
   review: {
     provider: "claudeAgent",
@@ -138,7 +137,6 @@ const CLAUDE_AGENT_MENTION_ALIASES: Record<string, ClaudeSubagentAliasDefinition
     prompt:
       "You are a senior code reviewer. Focus on behavioral regressions, correctness bugs, edge cases, and missing tests. Return findings first, then open questions, then a brief summary.",
     tools: ["Read", "Grep", "Glob"],
-    model: "sonnet",
   },
   reviewer: {
     provider: "claudeAgent",
@@ -151,7 +149,6 @@ const CLAUDE_AGENT_MENTION_ALIASES: Record<string, ClaudeSubagentAliasDefinition
     prompt:
       "You are a senior code reviewer. Focus on behavioral regressions, correctness bugs, edge cases, and missing tests. Return findings first, then open questions, then a brief summary.",
     tools: ["Read", "Grep", "Glob"],
-    model: "sonnet",
   },
   build: {
     provider: "claudeAgent",
@@ -164,7 +161,6 @@ const CLAUDE_AGENT_MENTION_ALIASES: Record<string, ClaudeSubagentAliasDefinition
     prompt:
       "You are an implementation-focused coding teammate. Make targeted changes, validate assumptions with the available tools, and return a short implementation summary plus any remaining risks.",
     tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write", "MultiEdit"],
-    model: "sonnet",
   },
   implement: {
     provider: "claudeAgent",
@@ -177,7 +173,6 @@ const CLAUDE_AGENT_MENTION_ALIASES: Record<string, ClaudeSubagentAliasDefinition
     prompt:
       "You are an implementation-focused coding teammate. Make targeted changes, validate assumptions with the available tools, and return a short implementation summary plus any remaining risks.",
     tools: ["Read", "Grep", "Glob", "Bash", "Edit", "Write", "MultiEdit"],
-    model: "sonnet",
   },
   plan: {
     provider: "claudeAgent",
@@ -190,7 +185,6 @@ const CLAUDE_AGENT_MENTION_ALIASES: Record<string, ClaudeSubagentAliasDefinition
     prompt:
       "You are a planning specialist. Clarify goals, evaluate tradeoffs, identify edge cases, and return a concrete ordered plan with the main risks called out explicitly.",
     tools: ["Read", "Grep", "Glob", "TodoWrite"],
-    model: "sonnet",
   },
   planner: {
     provider: "claudeAgent",
@@ -203,7 +197,6 @@ const CLAUDE_AGENT_MENTION_ALIASES: Record<string, ClaudeSubagentAliasDefinition
     prompt:
       "You are a planning specialist. Clarify goals, evaluate tradeoffs, identify edge cases, and return a concrete ordered plan with the main risks called out explicitly.",
     tools: ["Read", "Grep", "Glob", "TodoWrite"],
-    model: "sonnet",
   },
 };
 

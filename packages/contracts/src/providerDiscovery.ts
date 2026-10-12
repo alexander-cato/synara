@@ -28,6 +28,11 @@ export const ProviderSkillInterface = Schema.Struct({
 export type ProviderSkillInterface = typeof ProviderSkillInterface.Type;
 
 export const ProviderSkillDescriptor = Schema.Struct({
+  resourceId: Schema.optional(TrimmedNonEmptyString),
+  canonicalPath: Schema.optional(TrimmedNonEmptyString),
+  packageHash: Schema.optional(TrimmedNonEmptyString),
+  ownership: Schema.optional(TrimmedNonEmptyString),
+  diagnostics: Schema.optional(Schema.Array(TrimmedNonEmptyString)),
   name: TrimmedNonEmptyString,
   description: Schema.optional(TrimmedNonEmptyString),
   path: TrimmedNonEmptyString,

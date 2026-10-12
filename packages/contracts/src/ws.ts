@@ -1,3 +1,10 @@
+import {
+  AgentSetupInventoryInput,
+  AgentResourceReadInput,
+  AgentResourceSaveInput,
+  AgentReconcileApplyInput,
+  AgentRollbackInput,
+} from "./agentSetup";
 import { Schema, Struct } from "effect";
 import {
   LoadProjectImportHistoryInput,
@@ -346,6 +353,12 @@ export const WS_METHODS = {
   providerCompactThread: "provider.compactThread",
   providerListCommands: "provider.listCommands",
   providerListSkills: "provider.listSkills",
+  agentSetupInventory: "agentSetup.inventory",
+  agentSetupReadResource: "agentSetup.readResource",
+  agentSetupSaveResource: "agentSetup.saveResource",
+  agentSetupPreview: "agentSetup.preview",
+  agentSetupApply: "agentSetup.apply",
+  agentSetupRollback: "agentSetup.rollback",
   providerListSkillsCatalog: "provider.listSkillsCatalog",
   providerListPlugins: "provider.listPlugins",
   providerReadPlugin: "provider.readPlugin",
@@ -619,6 +632,12 @@ const WebSocketRequestBody = Schema.Union([
   tagRequestBody(WS_METHODS.providerCompactThread, ProviderCompactThreadInput),
   tagRequestBody(WS_METHODS.providerListCommands, ProviderListCommandsInput),
   tagRequestBody(WS_METHODS.providerListSkills, ProviderListSkillsInput),
+  tagRequestBody(WS_METHODS.agentSetupInventory, AgentSetupInventoryInput),
+  tagRequestBody(WS_METHODS.agentSetupReadResource, AgentResourceReadInput),
+  tagRequestBody(WS_METHODS.agentSetupSaveResource, AgentResourceSaveInput),
+  tagRequestBody(WS_METHODS.agentSetupPreview, AgentSetupInventoryInput),
+  tagRequestBody(WS_METHODS.agentSetupApply, AgentReconcileApplyInput),
+  tagRequestBody(WS_METHODS.agentSetupRollback, AgentRollbackInput),
   tagRequestBody(WS_METHODS.providerListSkillsCatalog, ProviderSkillsCatalogInput),
   tagRequestBody(WS_METHODS.providerListPlugins, ProviderListPluginsInput),
   tagRequestBody(WS_METHODS.providerReadPlugin, ProviderReadPluginInput),

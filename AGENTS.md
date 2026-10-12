@@ -58,4 +58,4 @@ Run `bun run windows-runtime:check` for platform/process-boundary changes and `b
 
 Finish the authorized scope, synchronize affected documentation, and report actual checks, failures, and unverified platform/runtime behavior. Do not equate mocks with live provider success or a local build with a signed release. Publishing, production operations, and changes to provider/model choices require the corresponding task authorization.
 
-Keep personal model rankings, pricing assumptions, and machine-specific wrapper recipes in operator configuration rather than shared project policy. Honor explicit operator model restrictions; do not use Haiku.
+Keep personal model rankings, pricing assumptions, and machine-specific wrapper recipes in operator configuration rather than shared project policy. Honor explicit operator model restrictions from personal agent configuration.
