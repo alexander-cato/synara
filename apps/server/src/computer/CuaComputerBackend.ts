@@ -241,7 +241,7 @@ function cuaKey(value: string): string {
   const key = value.toLowerCase();
   if (key === "insert" || key === "ins")
     throw new CuaActionError(
-      "Cua 0.28.2 has no Insert key mapping on macOS.",
+      "Cua has no Insert key mapping on macOS.",
       "not-dispatched",
       "unsupported_operation",
     );
@@ -2008,13 +2008,13 @@ export class CuaComputerBackend implements ComputerBackend {
   private async webSetValue(
     node: ComputerUiNode,
     windowId: string,
-    field: { token: string; index: number },
+    field: { token: string },
     value: string,
     admitMutation: () => void,
   ): Promise<ComputerBackendActionResult> {
     const result = await this.inputDispatch(
       "set_value",
-      { element_token: field.token, element_index: field.index, value },
+      { element_token: field.token, value },
       windowId,
       undefined,
       undefined,
@@ -2037,7 +2037,7 @@ export class CuaComputerBackend implements ComputerBackend {
   private async resolveWebField(
     windowId: string,
     node: ComputerUiNode,
-  ): Promise<{ token: string; index: number; value: string | null } | undefined> {
+  ): Promise<{ token: string; value: string | null } | undefined> {
     const { pid, window_id } = await this.target(windowId);
     const result = await this.call("get_window_state", {
       pid,
@@ -2049,7 +2049,7 @@ export class CuaComputerBackend implements ComputerBackend {
     });
     const elements = result.structuredContent?.elements;
     if (!Array.isArray(elements)) return undefined;
-    let match: { token: string; index: number; value: string | null } | undefined;
+    let match: { token: string; value: string | null } | undefined;
     for (const value of elements) {
       const element = record(value);
       if (element.in_web_content !== true) continue;
@@ -2058,11 +2058,9 @@ export class CuaComputerBackend implements ComputerBackend {
       const frame = optionalRect(element.frame);
       if (!frame || !sameRect(frame, node.frame)) continue;
       if (typeof element.element_token !== "string") continue;
-      const index = number(element.element_index);
       if (match) return undefined;
       match = {
         token: element.element_token,
-        index: Number.isFinite(index) ? index : 0,
         value: typeof element.value === "string" ? element.value : null,
       };
     }

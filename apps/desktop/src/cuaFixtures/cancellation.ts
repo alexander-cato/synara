@@ -2,6 +2,8 @@ import { BrowserWindow, ipcMain } from "electron";
 import { randomUUID } from "node:crypto";
 import { setTimeout as pause } from "node:timers/promises";
 import { performance } from "node:perf_hooks";
+import { execFileSync } from "node:child_process";
+import { join } from "node:path";
 import type { CuaDriverHost } from "../cuaDriverHost";
 import type { CuaComputerBackend } from "../../../server/src/computer/CuaComputerBackend";
 import { withDesktopDeliveryMode } from "../../../server/src/computer/DesktopOperationQueue";
@@ -18,6 +20,9 @@ export async function runCancellationFixture(
   // local broker — backend.stopInput() sends the same `stop` method over the
   // socket, exercising the identical cancellation wire path.
   const stop = () => (host ? host.stop() : backend.stopInput());
+  const controlledForeground = process.env.SYNARA_CUA_FIXTURE_FOREGROUND_CANCEL === "approved-once";
+  const deliver = <T>(run: () => Promise<T>) =>
+    controlledForeground ? withDesktopDeliveryMode("foreground", run) : run();
   const title = `Synara Cua Fixture ${process.pid} C`;
   const channel = `fixture-cancel-${randomUUID()}`;
   const window = new BrowserWindow({
@@ -59,6 +64,7 @@ export async function runCancellationFixture(
     // show:true defers ordering under a never-activated `open -g` launch and
     // marks the window key in-process; showInactive() does neither.
     window.showInactive();
+    if (controlledForeground) window.focus();
     window.webContents.on("will-navigate", (event) => event.preventDefault());
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     // WindowServer publishes intermediate bounds during the macOS opening
@@ -100,7 +106,7 @@ export async function runCancellationFixture(
       x: content.x + rect.x + 40,
       y: content.y + rect.y + rect.height / 2,
     };
-    const click = backend.click(start, target.id).then(
+    const click = deliver(() => backend.doubleClick(start, target.id)).then(
       (result) => ({ result }),
       (error) => ({ error: String(error) }),
     );
@@ -114,7 +120,8 @@ export async function runCancellationFixture(
     const after = { ...state };
     await pause(350);
     cases.push({
-      name: "cancel-held-click",
+      name: "cancel-held-double-click",
+      deliveryMode: controlledForeground ? "foreground" : "background",
       status:
         sawDown &&
         before.mouseUp === 0 &&
@@ -138,7 +145,7 @@ export async function runCancellationFixture(
     );
     const keyBaseline = { down: state.keyDown, up: state.keyUp };
     const text = "cancel-fixture-".repeat(60);
-    const typing = backend.typeText(text, target.id).then(
+    const typing = deliver(() => backend.typeText(text, target.id)).then(
       (result) => ({ result }),
       (error) => ({ error: String(error) }),
     );
@@ -155,6 +162,7 @@ export async function runCancellationFixture(
     const up = keyAfter.keyUp - keyBaseline.up;
     cases.push({
       name: "cancel-typing",
+      deliveryMode: controlledForeground ? "foreground" : "background",
       status:
         sawKey &&
         down > 0 &&
@@ -186,7 +194,7 @@ export async function runCancellationFixture(
     const vocabBaseline = { down: state.keyDown, up: state.keyUp };
     const vocab: Array<Record<string, unknown>> = [];
     for (const key of ["Page_Up", "Page_Down", "Shift_L"]) {
-      const outcome = await backend.pressKey(key, target.id).then(
+      const outcome = await deliver(() => backend.pressKey(key, target.id)).then(
         (result) => ({ result }),
         (error) => ({ error: String(error) }),
       );
@@ -264,6 +272,64 @@ export async function runCancellationFixture(
           outcome,
         });
       }
+      await observe();
+      window.focus();
+      await window.webContents.executeJavaScript(
+        "document.querySelector('#text').focus();document.querySelector('#text').select()",
+      );
+      const spacesBefore = (await backend.listSpaces()).spaces.filter((space) => space.current);
+      const baseline = { ...state };
+      const spaceText = "space-change-fixture-".repeat(100);
+      const typing = withDesktopDeliveryMode("foreground", () =>
+        backend.typeText(spaceText, target.id),
+      ).then(
+        (result) => ({ result }),
+        (error) => ({ error: String(error) }),
+      );
+      const sawInput = await waitFor(() => state.keyDown > baseline.keyDown);
+      window.setFullScreen(true);
+      await waitFor(() => window.isFullScreen());
+      await pause(1_000);
+      const spacesAfter = (await backend.listSpaces()).spaces.filter((space) => space.current);
+      const outcome = await typing;
+      const after = { ...state };
+      await pause(350);
+      const inputState = execFileSync(
+        process.env.SYNARA_CUA_FOCUS_PROBE ?? join(process.resourcesPath, "focus-probe"),
+        ["--once"],
+        { encoding: "utf8" },
+      )
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line))
+        .find((row) => typeof row.t === "number");
+      const changed = spacesAfter.some(
+        (space) => !spacesBefore.some((before) => before.id === space.id),
+      );
+      cases.push({
+        name: "space-change-cancels-owned-typing",
+        status:
+          sawInput &&
+          changed &&
+          "error" in outcome &&
+          after.text.length < spaceText.length &&
+          after.text === state.text &&
+          inputState?.key0Down === false &&
+          inputState?.leftMouseDown === false
+            ? "passed"
+            : "failed",
+        spacesBefore,
+        spacesAfter,
+        before: baseline,
+        after,
+        settled: { ...state },
+        outcome,
+        inputState: { key0Down: inputState?.key0Down, leftMouseDown: inputState?.leftMouseDown },
+        applicationKeyUpObserved: after.keyDown - baseline.keyDown === after.keyUp - baseline.keyUp,
+      });
+      window.setFullScreen(false);
+      await waitFor(() => !window.isFullScreen());
+      await pause(500);
     } else {
       cases.push({
         name: "foreground-cancel-drag-and-modified-click",

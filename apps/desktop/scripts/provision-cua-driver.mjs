@@ -217,7 +217,18 @@ try {
     if (commit !== release.source) throw new Error("Cua source commit mismatch.");
     const archive = join(temporary, "source.tar");
     // Ignore local checkout edits; only the pinned commit enters the build.
-    run("git", ["-C", source, "archive", `--output=${archive}`, release.source, "libs/cua-driver"]);
+    run("git", [
+      "-C",
+      source,
+      "archive",
+      `--output=${archive}`,
+      release.source,
+      "libs/cua-driver",
+      "libs/cua/Cargo.toml",
+      "libs/cua/crates/cua-telemetry",
+      "libs/cua/crates/cua-teleport/src/ux/targets.json",
+      "libs/images/sandbox-images.json",
+    ]);
     const build = join(temporary, "build");
     await mkdir(build);
     run("tar", ["-xf", archive, "-C", build]);

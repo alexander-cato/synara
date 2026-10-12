@@ -590,7 +590,10 @@ async function main() {
   // Named secondary actions on the resolved element: press lands the driver's
   // AXPress recipe on the owned counter button, and a name outside the
   // admitted vocabulary refuses before anything is dispatched.
-  const actionButton = findRole(semanticState.root, "AXButton");
+  // setValue's renderer verification publishes a new native snapshot. Resolve
+  // a fresh token before the next action instead of reusing semanticState.
+  const actionState = await backend.getState({ windowId: window.id, includeTree: true });
+  const actionButton = findRole(actionState.root, "AXButton");
   if (actionButton?.activationPoint) {
     const actionTarget = {
       target: { windowId: window.id, label: "Click counter" },

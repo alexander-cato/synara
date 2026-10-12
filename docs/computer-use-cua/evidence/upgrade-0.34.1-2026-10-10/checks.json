@@ -1,0 +1,118 @@
+{
+  "toolchains": {
+    "node": "24.13.1",
+    "bun": "1.4.2",
+    "rust": "1.97.1"
+  },
+  "fmt": {
+    "command": "bun run fmt:check",
+    "status": "passed"
+  },
+  "lint": {
+    "command": "bun run lint",
+    "status": "passed",
+    "errors": 0,
+    "warnings": 887
+  },
+  "typecheck": {
+    "command": "bun run typecheck",
+    "status": "passed",
+    "packages": 7
+  },
+  "windowsBoundary": {
+    "command": "bun run windows-runtime:check",
+    "status": "passed",
+    "applicationSourceFiles": 309,
+    "boundaryFiles": 113,
+    "dependencyPatches": 4,
+    "workspaceManifests": 8
+  },
+  "rust": {
+    "contracts": {
+      "passed": 61
+    },
+    "core": {
+      "passed": 881
+    },
+    "cursor": {
+      "passed": 152
+    },
+    "macos": {
+      "passed": 580,
+      "ignored": 7
+    },
+    "cli": {
+      "passed": 305
+    },
+    "linuxDeltaPortableCoreOnMacos": {
+      "passed": 888
+    }
+  },
+  "repository": {
+    "combinedPassed": 16383,
+    "combinedSkipped": 38,
+    "monolithicStatus": "interrupted after checkpoint failures and an unchanged Git integration stall",
+    "packagesCompletedInRootRun": {
+      "contracts": {
+        "passed": 195
+      },
+      "scripts": {
+        "passed": 251
+      },
+      "shared": {
+        "passed": 1037,
+        "skipped": 2
+      },
+      "web": {
+        "passed": 5327,
+        "skipped": 3
+      },
+      "desktop": {
+        "passed": 1401,
+        "skipped": 6
+      }
+    },
+    "serverWithoutGitCore": {
+      "files": 579,
+      "passed": 8013,
+      "failed": 28,
+      "skipped": 27,
+      "unhandledErrors": 3
+    },
+    "gitCoreSeparate": {
+      "passed": 131
+    },
+    "checkpointFocused": {
+      "passed": 9,
+      "skipped": 85
+    },
+    "providerHomeSensitiveFilesSeparate": {
+      "files": 3,
+      "passed": 352,
+      "skipped": 2
+    },
+    "providerSensitiveOriginalFailure": "Default provider-home authentication symlink checks or timeout; three files failed.",
+    "testIsolation": "Temporary default-home resolver mock and temporary Synara home only for the three provider-sensitive files. Explicit homes, authentication guard code and provider implementations unchanged.",
+    "userConfigurationChanged": false
+  },
+  "documentationLinks": {
+    "localLinksResolved": 20
+  },
+  "patchReconstruction": {
+    "source": "0c69d9a2c8abbb5051a2df4a23f0fa166d5385dc",
+    "patches": [
+      {
+        "patch": "0001-synara-native.patch",
+        "sha256": "c358982d6d6c64f72190815279a093e71abfcf037f018bb8b9ab225504574354",
+        "applied": true
+      },
+      {
+        "patch": "0002-synara-linux-browser.patch",
+        "sha256": "acb0bf7bb52ec293f52f711748f23c1878481f6f8344d670dfda3f58870e83e5",
+        "applied": true
+      }
+    ],
+    "trackedFilesIdentical": 1306,
+    "unexpectedFiles": 0
+  }
+}

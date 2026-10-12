@@ -6,7 +6,11 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
-const destination = "/private/tmp/synara-cua-implementation/Synara Cua Fixture.app";
+const destination =
+  process.env.SYNARA_CUA_FIXTURE_APP ??
+  "/private/tmp/synara-cua-implementation/Synara Cua Fixture.app";
+if (!destination.startsWith("/private/tmp/") || !destination.endsWith(".app"))
+  throw new Error("Fixture app destination must be a temporary .app path.");
 const resources = join(destination, "Contents/Resources");
 await rm(destination, { recursive: true, force: true });
 await cp(join(root, "apps/desktop/node_modules/electron/dist/Electron.app"), destination, {
@@ -30,11 +34,13 @@ await writeFile(
   join(resources, "app/package.json"),
   JSON.stringify({ name: "synara-cua-fixture", main: "fixture.cjs" }),
 );
-await cp(join(root, "apps/desktop/resources/cua-driver"), join(resources, "cua-driver"), {
-  recursive: true,
-});
 if (process.env.SYNARA_CUA_FIXTURE_DRIVER) {
+  await mkdir(join(resources, "cua-driver"), { recursive: true });
   await cp(process.env.SYNARA_CUA_FIXTURE_DRIVER, join(resources, "cua-driver/cua-driver"));
+} else {
+  await cp(join(root, "apps/desktop/resources/cua-driver"), join(resources, "cua-driver"), {
+    recursive: true,
+  });
 }
 await writeFile(
   join(resources, "fixture-native.json"),
@@ -65,7 +71,7 @@ execFileSync(
     "-sdk",
     macSdk,
     "-module-cache-path",
-    "/private/tmp/synara-cua-implementation/swift-module-cache",
+    join(destination, "../swift-module-cache"),
     join(root, "scripts/computer-use-fixtures/NativeFixture.swift"),
     "-o",
     join(resources, "native-fixture"),

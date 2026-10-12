@@ -3,11 +3,17 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtemp, writeFile, chmod } from "node:fs/promises";
+import { mkdtemp, writeFile, chmod, readFile } from "node:fs/promises";
 import { createConnection } from "node:net";
 import { join, isAbsolute } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import nativeRelease from "../../packages/shared/src/cuaDriverRelease.json" with { type: "json" };
+const nativeRelease = JSON.parse(
+  await readFile(
+    process.env.SYNARA_CUA_PROBE_RELEASE ??
+      new URL("../../packages/shared/src/cuaDriverRelease.json", import.meta.url),
+    "utf8",
+  ),
+);
 
 const driver = process.argv[2];
 if (!driver || !isAbsolute(driver)) throw new Error("Supply an absolute patched driver path.");

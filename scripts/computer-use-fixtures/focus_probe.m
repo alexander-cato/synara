@@ -312,6 +312,10 @@ static void emitSample(double tMs, bool withTopWindow) {
   jsonNumberOrNull(stdout, focusedPid > 0, focusedPid);
   fputs(",\"focused\":", stdout);
   jsonTextOrNull(stdout, focused[0] ? focused : NULL);
+  fprintf(stdout, ",\"key0Down\":%s,\"shiftDown\":%s,\"leftMouseDown\":%s",
+    CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, 0) ? "true" : "false",
+    CGEventSourceKeyState(kCGEventSourceStateCombinedSessionState, 56) ? "true" : "false",
+    CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState, kCGMouseButtonLeft) ? "true" : "false");
   fputs("}\n", stdout);
 }
 

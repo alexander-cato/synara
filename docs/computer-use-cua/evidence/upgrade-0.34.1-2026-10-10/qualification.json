@@ -1,0 +1,448 @@
+{
+  "date": "2026-10-11",
+  "platform": "macOS arm64",
+  "electron": "43.4.1",
+  "pin": {
+    "version": "0.34.1",
+    "source": "0c69d9a2c8abbb5051a2df4a23f0fa166d5385dc",
+    "sha256": "52de49b5046df19245ad02ff9aa89ce9caf69e84988e1d0fac677611dd83e48c",
+    "nativeRevision": 40,
+    "patchSha256": "c358982d6d6c64f72190815279a093e71abfcf037f018bb8b9ab225504574354",
+    "linuxBrowserPatchSha256": "acb0bf7bb52ec293f52f711748f23c1878481f6f8344d670dfda3f58870e83e5",
+    "linuxBrowserInputControl": 1,
+    "rustVersion": "1.97.1"
+  },
+  "builds": {
+    "arm64": {
+      "version": "0.34.1",
+      "source": "0c69d9a2c8abbb5051a2df4a23f0fa166d5385dc",
+      "nativeRevision": 40,
+      "platform": "darwin",
+      "patched": true,
+      "patchSha256": "c358982d6d6c64f72190815279a093e71abfcf037f018bb8b9ab225504574354",
+      "rustVersion": "1.97.1",
+      "rustcVersion": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+      "architectures": ["arm64"],
+      "binarySha256": "ec5a158cefc4e6ced68bc1473da21566f6fc141517524f46a96dc8ba57d436ab",
+      "upstreamArchiveSha256": "52de49b5046df19245ad02ff9aa89ce9caf69e84988e1d0fac677611dd83e48c"
+    },
+    "universal": {
+      "version": "0.34.1",
+      "source": "0c69d9a2c8abbb5051a2df4a23f0fa166d5385dc",
+      "nativeRevision": 40,
+      "platform": "darwin",
+      "patched": true,
+      "patchSha256": "c358982d6d6c64f72190815279a093e71abfcf037f018bb8b9ab225504574354",
+      "rustVersion": "1.97.1",
+      "rustcVersion": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+      "architectures": ["arm64", "x64"],
+      "binarySha256": "94a6c8467c9bc6dad38e1e128e2aac1954562911a25cf59df08ed9ef5844cea0",
+      "upstreamArchiveSha256": "52de49b5046df19245ad02ff9aa89ce9caf69e84988e1d0fac677611dd83e48c"
+    }
+  },
+  "patchReconstruction": {
+    "source": "0c69d9a2c8abbb5051a2df4a23f0fa166d5385dc",
+    "patches": [
+      {
+        "patch": "0001-synara-native.patch",
+        "sha256": "c358982d6d6c64f72190815279a093e71abfcf037f018bb8b9ab225504574354",
+        "applied": true
+      },
+      {
+        "patch": "0002-synara-linux-browser.patch",
+        "sha256": "acb0bf7bb52ec293f52f711748f23c1878481f6f8344d670dfda3f58870e83e5",
+        "applied": true
+      }
+    ],
+    "trackedFilesIdentical": 1306,
+    "unexpectedFiles": 0
+  },
+  "nativeCases": [
+    {
+      "name": "one-click-one-effect",
+      "status": "passed"
+    },
+    {
+      "name": "same-pid-keyboard",
+      "status": "passed-refusal"
+    },
+    {
+      "name": "single-window-identical-text",
+      "status": "passed"
+    },
+    {
+      "name": "ax-set-value",
+      "status": "passed"
+    },
+    {
+      "name": "modal-blocks-parent-click",
+      "status": "passed"
+    },
+    {
+      "name": "exact-modal-control",
+      "status": "passed"
+    },
+    {
+      "name": "background-click-with-independent-owned-keys",
+      "status": "passed"
+    },
+    {
+      "name": "minimized-target",
+      "status": "passed"
+    }
+  ],
+  "electronCases": [
+    {
+      "name": "one-click-one-effect",
+      "status": "passed"
+    },
+    {
+      "name": "identical-text-replacement",
+      "status": "refused"
+    },
+    {
+      "name": "three-window-focus-neutral-semantic-text",
+      "status": "passed"
+    },
+    {
+      "name": "single-window-identical-text",
+      "status": "failed"
+    },
+    {
+      "name": "explicit-foreground-text",
+      "status": "passed"
+    },
+    {
+      "name": "ax-set-value",
+      "status": "passed"
+    },
+    {
+      "name": "ax-perform-action-press",
+      "status": "passed"
+    },
+    {
+      "name": "ax-perform-action-refusal",
+      "status": "passed"
+    },
+    {
+      "name": "ax-perform-action-open",
+      "status": "passed"
+    },
+    {
+      "name": "moved-target",
+      "status": "passed"
+    },
+    {
+      "name": "closed-target",
+      "status": "passed"
+    }
+  ],
+  "cancellationCases": [
+    {
+      "name": "cancel-held-double-click",
+      "status": "passed",
+      "stopMilliseconds": 127.021,
+      "before": {
+        "mouseDown": 1,
+        "mouseUp": 0,
+        "dragged": 0,
+        "keyDown": 0,
+        "keyUp": 0,
+        "buttons": 1
+      },
+      "after": {
+        "mouseDown": 1,
+        "mouseUp": 1,
+        "dragged": 0,
+        "keyDown": 0,
+        "keyUp": 0,
+        "buttons": 0
+      }
+    },
+    {
+      "name": "cancel-typing",
+      "status": "passed",
+      "stopMilliseconds": 175.588,
+      "before": {
+        "mouseDown": 1,
+        "mouseUp": 1,
+        "dragged": 0,
+        "keyDown": 1,
+        "keyUp": 0,
+        "buttons": 0
+      },
+      "after": {
+        "mouseDown": 1,
+        "mouseUp": 1,
+        "dragged": 0,
+        "keyDown": 1,
+        "keyUp": 1,
+        "buttons": 0
+      }
+    },
+    {
+      "name": "press-key-vocabulary",
+      "status": "passed",
+      "before": {
+        "down": 1,
+        "up": 1
+      },
+      "after": {
+        "mouseDown": 1,
+        "mouseUp": 1,
+        "dragged": 0,
+        "keyDown": 4,
+        "keyUp": 4,
+        "buttons": 0
+      }
+    },
+    {
+      "name": "foreground-cancel-drag",
+      "status": "passed",
+      "stopMilliseconds": 167.593,
+      "before": {
+        "mouseDown": 2,
+        "mouseUp": 1,
+        "dragged": 1,
+        "keyDown": 4,
+        "keyUp": 4,
+        "buttons": 1
+      },
+      "after": {
+        "mouseDown": 2,
+        "mouseUp": 2,
+        "dragged": 1,
+        "keyDown": 4,
+        "keyUp": 4,
+        "buttons": 0
+      }
+    },
+    {
+      "name": "foreground-cancel-modified-click",
+      "status": "passed",
+      "stopMilliseconds": 173.327,
+      "before": {
+        "mouseDown": 3,
+        "mouseUp": 2,
+        "dragged": 2,
+        "keyDown": 5,
+        "keyUp": 4,
+        "buttons": 1
+      },
+      "after": {
+        "mouseDown": 3,
+        "mouseUp": 3,
+        "dragged": 2,
+        "keyDown": 5,
+        "keyUp": 5,
+        "buttons": 0
+      }
+    },
+    {
+      "name": "space-change-cancels-owned-typing",
+      "status": "passed",
+      "spaceChanged": true,
+      "inputStopped": true,
+      "osKeyReleased": true,
+      "osMouseReleased": true,
+      "applicationKeyUpObserved": false
+    }
+  ],
+  "backgroundCoexistence": {
+    "status": "passed",
+    "independentInput": "AppKit events sent only inside the owned fixture, no global event injection",
+    "clickDelta": 1,
+    "foregroundKeyDownDelta": 10,
+    "foregroundKeyUpDelta": 10,
+    "foregroundTextLength": 10,
+    "sampleCount": 30,
+    "measuredMs": 580,
+    "offBaselineSamples": 0,
+    "coverage": {
+      "pid": 1,
+      "keyWin": 1,
+      "topWin": 0.2,
+      "space": 1,
+      "focusedPid": 1,
+      "focused": 1
+    }
+  },
+  "baselineComparison": {
+    "driverVersion": "0.28.2",
+    "nativeRevision": 39,
+    "source": "7fe7c33f741ee2dd5961ba80044d59f93b48ba47",
+    "scope": "Same background cases through single-window typing; later foreground/native/gateway cases skipped.",
+    "cases": [
+      {
+        "name": "one-click-one-effect",
+        "status": "failed"
+      },
+      {
+        "name": "identical-text-replacement",
+        "status": "refused"
+      },
+      {
+        "name": "three-window-focus-neutral-semantic-text",
+        "status": "failed"
+      },
+      {
+        "name": "single-window-identical-text",
+        "status": "failed"
+      }
+    ],
+    "backgroundSyntheticTextLanded": false,
+    "candidateBackgroundSyntheticTextLanded": false
+  },
+  "gatewayCases": [
+    {
+      "name": "different-window-frame",
+      "status": "passed"
+    },
+    {
+      "name": "gateway-native-click",
+      "status": "passed"
+    },
+    {
+      "name": "foreground-denial-before-native",
+      "status": "passed"
+    },
+    {
+      "name": "off-refuses-native-input",
+      "status": "passed"
+    },
+    {
+      "name": "ended-turn-refuses-native-input",
+      "status": "passed"
+    },
+    {
+      "name": "gateway-focus-neutral",
+      "status": "failed"
+    }
+  ],
+  "gatewayFocusLimit": {
+    "status": "inconclusive",
+    "reason": "Sampler recorded a transition from the owned fixture to an outside application after the click; its cause is unproven. No outside application names, titles, paths, text, or identifiers retained."
+  },
+  "controlProbes": {
+    "arm64": {
+      "cases": [
+        {
+          "name": "patched-identity",
+          "passed": true
+        },
+        {
+          "name": "read-only-target-readiness-refusal",
+          "passed": true
+        },
+        {
+          "name": "cancel_input-wrong-generation-refused",
+          "passed": true
+        },
+        {
+          "name": "cancel_input-non-host-peer-refused",
+          "passed": true
+        },
+        {
+          "name": "interrupt_input-wrong-generation-refused",
+          "passed": true
+        },
+        {
+          "name": "interrupt_input-non-host-peer-refused",
+          "passed": true
+        },
+        {
+          "name": "host-interrupt-drain-acknowledged",
+          "passed": true
+        },
+        {
+          "name": "interrupt-reuses-live-generation",
+          "passed": true
+        },
+        {
+          "name": "buffered-pre-interrupt-call-cannot-dispatch",
+          "passed": true
+        },
+        {
+          "name": "host-cleanup-acknowledged",
+          "passed": true
+        },
+        {
+          "name": "repeat-cleanup",
+          "passed": true
+        },
+        {
+          "name": "interrupt-never-reopens-retired-generation",
+          "passed": true
+        }
+      ],
+      "exit": {
+        "code": 0,
+        "signal": null
+      }
+    },
+    "universalArm64": {
+      "cases": [
+        {
+          "name": "patched-identity",
+          "passed": true
+        },
+        {
+          "name": "read-only-target-readiness-refusal",
+          "passed": true
+        },
+        {
+          "name": "cancel_input-wrong-generation-refused",
+          "passed": true
+        },
+        {
+          "name": "cancel_input-non-host-peer-refused",
+          "passed": true
+        },
+        {
+          "name": "interrupt_input-wrong-generation-refused",
+          "passed": true
+        },
+        {
+          "name": "interrupt_input-non-host-peer-refused",
+          "passed": true
+        },
+        {
+          "name": "host-interrupt-drain-acknowledged",
+          "passed": true
+        },
+        {
+          "name": "interrupt-reuses-live-generation",
+          "passed": true
+        },
+        {
+          "name": "buffered-pre-interrupt-call-cannot-dispatch",
+          "passed": true
+        },
+        {
+          "name": "host-cleanup-acknowledged",
+          "passed": true
+        },
+        {
+          "name": "repeat-cleanup",
+          "passed": true
+        },
+        {
+          "name": "interrupt-never-reopens-retired-generation",
+          "passed": true
+        }
+      ],
+      "exit": {
+        "code": 0,
+        "signal": null
+      }
+    }
+  },
+  "runtimeLimits": [
+    "Intel build verified; Intel runtime not tested.",
+    "Linux native build and runtime not tested; browser-only portable policy tested on macOS.",
+    "Windows boundary check is static; Windows runtime not tested.",
+    "Ad-hoc fixture and staged binaries; distribution signing, notarization and a full packaged provider task are not tested.",
+    "Independent owned AppKit input is not a physical-human input test.",
+    "Forced background Chromium pixel click and Enter did not consistently land in the separate regression runner on either baseline or candidate. No activation or automatic replay used."
+  ]
+}

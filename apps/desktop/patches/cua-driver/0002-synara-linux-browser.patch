@@ -1,8 +1,8 @@
 diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/browser/engine.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/browser/engine.rs
-index 2a10040..73150e1 100644
+index 9e9c584..fd71304 100644
 --- a/libs/cua-driver/rust/crates/cua-driver-core/src/browser/engine.rs
 +++ b/libs/cua-driver/rust/crates/cua-driver-core/src/browser/engine.rs
-@@ -1751,6 +1751,17 @@ impl BrowserEngine {
+@@ -1769,6 +1769,17 @@ impl BrowserEngine {
      ) -> Result<ValidatedTab, BrowserRefusal> {
          let record = self.target_for(session, target_id).await?;
  
@@ -21,10 +21,10 @@ index 2a10040..73150e1 100644
              return Err(refuse(
                  BrowserRefusalCode::BrowserWrongTargetRefused,
 diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/browser/mod.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/browser/mod.rs
-index 1517fee..803895b 100644
+index dcfb54a..4a76f0d 100644
 --- a/libs/cua-driver/rust/crates/cua-driver-core/src/browser/mod.rs
 +++ b/libs/cua-driver/rust/crates/cua-driver-core/src/browser/mod.rs
-@@ -44,6 +44,7 @@ mod grant;
+@@ -46,6 +46,7 @@ mod keyed_gates;
  #[cfg(test)]
  pub(crate) mod mock_cdp;
  mod mutation;
@@ -398,217 +398,8 @@ index 0000000..8c4ea41
 +        assert_eq!(gate.cancel_and_wait(Duration::ZERO), 1);
 +    }
 +}
-diff --git a/libs/cua-driver/rust/crates/cua-driver-core/src/browser/prepare.rs b/libs/cua-driver/rust/crates/cua-driver-core/src/browser/prepare.rs
-index f4ec029..f7b2684 100644
---- a/libs/cua-driver/rust/crates/cua-driver-core/src/browser/prepare.rs
-+++ b/libs/cua-driver/rust/crates/cua-driver-core/src/browser/prepare.rs
-@@ -378,8 +378,10 @@ fn isolated_browser_command(executable: &str, profile: &Path, headless: bool) ->
-     }
-     #[cfg(target_os = "linux")]
-     {
--        let native_wayland = std::env::var("XDG_SESSION_TYPE")
--            .is_ok_and(|session| session.eq_ignore_ascii_case("wayland"))
-+        // A real headless browser must not depend on a visible compositor.
-+        let native_wayland = !headless
-+            && std::env::var("XDG_SESSION_TYPE")
-+                .is_ok_and(|session| session.eq_ignore_ascii_case("wayland"))
-             && std::env::var_os("WAYLAND_DISPLAY").is_some()
-             && std::env::var_os("DISPLAY").is_none();
-         let no_sandbox = std::env::var("CUA_E2E_BROWSER_NO_SANDBOX").as_deref() == Ok("1");
-@@ -669,6 +671,17 @@ fn mutation_checkpoint() -> Result<(), BrowserRefusal> {
-     })
- }
- 
-+/// Refusal drops only the exact pending lifecycle. Its existing owner reaps
-+/// the process group and removes the profile only while the marker matches.
-+fn commit_prepared_browser(
-+    browsers: &ManagedBrowsers,
-+    browser: ManagedBrowser,
-+) -> Result<(), BrowserRefusal> {
-+    mutation_checkpoint()?;
-+    browsers.lock().unwrap().push(browser);
-+    Ok(())
-+}
-+
- fn spawn_isolated_browser(command: &mut Command) -> Result<Child, BrowserRefusal> {
-     mutation_checkpoint()?;
-     command.spawn().map_err(|error| {
-@@ -738,6 +751,16 @@ impl BrowserEngine {
-         &self,
-         request: PrepareRequest,
-     ) -> Result<PrepareOutcome, BrowserRefusal> {
-+        // The embedded Linux contract supports driver-owned headless profiles.
-+        // Existing-profile setup can inject native UI input, and a windowed
-+        // launch has desktop effects that this browser-only gate cannot own.
-+        #[cfg(target_os = "linux")]
-+        if crate::embedded_mode() && (request.windowed || request.strategy.is_some()) {
-+            return Err(refusal(
-+                BrowserRefusalCode::BrowserRouteUnavailable,
-+                "Linux Computer browser control requires a driver-owned headless isolated profile; visible launch and existing-profile setup are unavailable",
-+            ));
-+        }
-         if request.strategy == Some(PrepareStrategy::ExistingProfile) {
-             return self.attach_existing_profile(request).await;
-         }
-@@ -805,33 +828,32 @@ impl BrowserEngine {
-         let prepared_profile = prepare_profile(profile_request)?;
-         let headless = !request.windowed;
-         let mut command = isolated_browser_command(&executable, &prepared_profile.path, headless);
--        let mut child = spawn_isolated_browser(&mut command).map_err(|error| {
-+        let child = spawn_isolated_browser(&mut command).map_err(|error| {
-             cleanup_created_profile(&prepared_profile);
-             error
-         })?;
--        let endpoint = match wait_for_spawned_endpoint(&mut child, &prepared_profile.path).await {
--            Ok(endpoint) => {
--                match attest_spawned_endpoint(self, i64::from(child.id()), endpoint).await {
--                    Ok(endpoint) => endpoint,
--                    Err(error) => {
--                        let _ = child.kill();
--                        let _ = child.wait();
--                        cleanup_created_profile(&prepared_profile);
--                        return Err(error);
--                    }
--                }
--            }
--            Err(error) => {
--                let _ = child.kill();
--                let _ = child.wait();
--                cleanup_created_profile(&prepared_profile);
--                return Err(error);
-+        let mut owner_sessions = vec![request.session];
-+        if let Some(transport_session) = request.transport_session {
-+            if !owner_sessions.contains(&transport_session) {
-+                owner_sessions.push(transport_session);
-             }
-+        }
-+        // Establish RAII ownership before endpoint discovery's first await.
-+        // Every error or dropped future reaps this exact pending process group
-+        // and marked profile, using the same owner as a committed lifecycle.
-+        let mut pending_browser = ManagedBrowser {
-+            owned_pid: i64::from(child.id()),
-+            child,
-+            profile: prepared_profile.path,
-+            delete_profile: prepared_profile.delete_on_cleanup,
-+            marker: prepared_profile.marker,
-+            owner_sessions: owner_sessions.clone(),
-+            headless,
-         };
--        // Nothing here hides, moves, or dresses a window. The default launch
--        // is headless: no native window and no Dock entry exist to manage.
--        // The explicit windowed opt-in creates a real browser window, which
--        // is what the caller asked for.
-+        let endpoint =
-+            wait_for_spawned_endpoint(&mut pending_browser.child, &pending_browser.profile).await?;
-+        let endpoint =
-+            attest_spawned_endpoint(self, i64::from(pending_browser.child.id()), endpoint).await?;
-         let posture_note = if headless {
-             " The spawned browser is headless: no native window and no Dock entry."
-         } else {
-@@ -839,27 +861,15 @@ impl BrowserEngine {
-              browser window (and the browser's Dock entry)."
-         };
-         let prepared_pid = endpoint.ownership.owner_pid;
--        let mut owner_sessions = vec![request.session];
--        if let Some(transport_session) = request.transport_session {
--            if !owner_sessions.contains(&transport_session) {
--                owner_sessions.push(transport_session);
--            }
--        }
--        if let Ok(fingerprint) = self.platform.process_fingerprint(prepared_pid).await {
-+        pending_browser.owned_pid = prepared_pid;
-+        let fingerprint = self.platform.process_fingerprint(prepared_pid).await;
-+        commit_prepared_browser(&self.managed_browsers, pending_browser)?;
-+        if let Ok(fingerprint) = fingerprint {
-             for owner in &owner_sessions {
-                 self.protected_resource_ownership
-                     .mark_driver_owned_process(owner, fingerprint.clone());
-             }
-         }
--        self.managed_browsers.lock().unwrap().push(ManagedBrowser {
--            child,
--            owned_pid: prepared_pid,
--            profile: prepared_profile.path,
--            delete_profile: prepared_profile.delete_on_cleanup,
--            marker: prepared_profile.marker,
--            owner_sessions,
--            headless,
--        });
-         Ok(PrepareOutcome {
-             action: PrepareAction::LaunchedIsolatedBrowser,
-             endpoint: Some(endpoint),
-@@ -1346,6 +1356,69 @@ mod tests {
-         assert!(!marker.exists());
-     }
- 
-+    #[cfg(unix)]
-+    #[tokio::test]
-+    async fn interrupted_post_launch_reaps_the_owned_child_profile_and_never_commits() {
-+        use super::super::operation_gate::OperationGate;
-+        use std::os::unix::process::CommandExt;
-+
-+        let root = tempfile::tempdir().unwrap();
-+        let profile = root.path().join("owned-profile");
-+        fs::create_dir(&profile).unwrap();
-+        let marker = ProfileMarker {
-+            schema: PROFILE_SCHEMA.to_owned(),
-+            mode: PrepareProfileMode::IsolatedNew,
-+            name: None,
-+        };
-+        write_profile_marker(&profile, &marker).unwrap();
-+        let unrelated = root.path().join("unrelated");
-+        fs::write(&unrelated, "preserve").unwrap();
-+        let child = Command::new("/bin/sleep")
-+            .arg("60")
-+            .process_group(0)
-+            .stdin(Stdio::null())
-+            .stdout(Stdio::null())
-+            .stderr(Stdio::null())
-+            .spawn()
-+            .unwrap();
-+        let pid = child.id();
-+        let pending = ManagedBrowser {
-+            child,
-+            owned_pid: i64::from(pid),
-+            profile: profile.clone(),
-+            delete_profile: true,
-+            marker,
-+            owner_sessions: vec!["interrupted-launch".to_owned()],
-+            headless: true,
-+        };
-+        let browsers = ManagedBrowsers::default();
-+        let gate = Arc::new(OperationGate::default());
-+        let operation = gate.admit(Some(0)).unwrap();
-+        let epoch = operation.epoch();
-+        let checkpoint_gate = gate.clone();
-+        super::super::cancellation::scope(
-+            Arc::new(move || checkpoint_gate.checkpoint(epoch)),
-+            Arc::new(|| panic!("launch owns no CDP release")),
-+            async {
-+                // Stand in for asynchronous endpoint/fingerprint discovery.
-+                tokio::task::yield_now().await;
-+                assert!(!gate.interrupt_and_wait(Duration::ZERO).resumed);
-+                assert!(commit_prepared_browser(&browsers, pending).is_err());
-+            },
-+        )
-+        .await;
-+        drop(operation);
-+        assert!(gate.interrupt_and_wait(Duration::ZERO).resumed);
-+        assert!(browsers.lock().unwrap().is_empty());
-+        assert!(!profile.exists());
-+        assert_eq!(fs::read_to_string(unrelated).unwrap(), "preserve");
-+        assert_eq!(unsafe { libc::kill(pid as libc::pid_t, 0) }, -1);
-+        assert_eq!(
-+            std::io::Error::last_os_error().raw_os_error(),
-+            Some(libc::ESRCH)
-+        );
-+    }
-+
-     #[tokio::test]
-     async fn completed_claim_wins_while_optional_consent_is_absent() {
-         let mut claim = Box::pin(async {
 diff --git a/libs/cua-driver/rust/crates/cua-driver/src/sdk_adapter.rs b/libs/cua-driver/rust/crates/cua-driver/src/sdk_adapter.rs
-index be5e28c..c665efb 100644
+index 0bb639c..4785a5e 100644
 --- a/libs/cua-driver/rust/crates/cua-driver/src/sdk_adapter.rs
 +++ b/libs/cua-driver/rust/crates/cua-driver/src/sdk_adapter.rs
 @@ -12,7 +12,7 @@ use cua_driver_core::{server::ToolProvider, CaptureScope};
@@ -620,7 +411,7 @@ index be5e28c..c665efb 100644
  pub(crate) fn is_native_input_tool(name: &str) -> bool {
      matches!(
          name,
-@@ -263,6 +263,26 @@ impl SdkAdapter {
+@@ -275,6 +275,26 @@ impl SdkAdapter {
          } else {
              None
          };
@@ -647,7 +438,7 @@ index be5e28c..c665efb 100644
          // Native-side authoritative secure-input refusal for keyboard delivery.
          // macOS suppresses synthesized key events while a password field holds
          // secure input, so refuse before target admission: nothing is prepared,
-@@ -414,7 +434,23 @@ impl SdkAdapter {
+@@ -426,7 +446,23 @@ impl SdkAdapter {
          } else {
              invocation.await
          };
@@ -672,7 +463,7 @@ index be5e28c..c665efb 100644
          let result = invocation.await;
          let result = result.map_err(|error| {
              if let Some((session, marker, previous)) = ending_tombstone {
-@@ -435,7 +471,13 @@ impl SdkAdapter {
+@@ -447,7 +483,13 @@ impl SdkAdapter {
              format!("{name} returned invalid SDK result JSON: {error}")
          })?;
          #[cfg(target_os = "macos")]
@@ -688,7 +479,7 @@ index be5e28c..c665efb 100644
              if !value.get("structuredContent").is_some_and(Value::is_object) {
                  value["structuredContent"] = json!({});
 diff --git a/libs/cua-driver/rust/crates/cua-driver/src/serve.rs b/libs/cua-driver/rust/crates/cua-driver/src/serve.rs
-index f499100..3949ad0 100644
+index af3c9e1..54396d9 100644
 --- a/libs/cua-driver/rust/crates/cua-driver/src/serve.rs
 +++ b/libs/cua-driver/rust/crates/cua-driver/src/serve.rs
 @@ -21,6 +21,11 @@
@@ -703,7 +494,7 @@ index f499100..3949ad0 100644
  use std::collections::{HashMap, HashSet};
  use std::sync::{Mutex, OnceLock};
  
-@@ -467,7 +472,7 @@ fn observe_daemon_error(
+@@ -430,7 +435,7 @@ fn observe_daemon_error(
  /// This field belongs to the authenticated desktop host, outside public tool
  /// arguments. Retaining the host's epoch rejects buffered pre-interrupt calls
  /// even when the daemon starts parsing them only after the gate reopens.
@@ -712,14 +503,14 @@ index f499100..3949ad0 100644
  fn host_input_epoch(
      line: &str,
      request: &DaemonRequest,
-@@ -708,14 +713,20 @@ fn permission_gate_response_for_state(
+@@ -680,14 +685,20 @@ fn permission_gate_response_for_state(
  fn daemon_metadata_response() -> DaemonResponse {
      let mut metadata = serde_json::to_value(cua_driver_core::daemon::current_daemon_metadata())
          .expect("daemon metadata is serializable");
 -    #[cfg(target_os = "macos")]
 +    #[cfg(any(target_os = "macos", target_os = "linux"))]
      {
-         metadata["synara_native_revision"] = serde_json::json!(39);
+         metadata["synara_native_revision"] = serde_json::json!(40);
      }
 +    #[cfg(target_os = "linux")]
 +    {
@@ -735,7 +526,7 @@ index f499100..3949ad0 100644
  async fn cancel_input_response(request: &DaemonRequest, trusted_host: bool) -> DaemonResponse {
      if !cua_driver_core::embedded_mode() || !trusted_host {
          return DaemonResponse::err(
-@@ -737,8 +748,7 @@ async fn cancel_input_response(request: &DaemonRequest, trusted_host: bool) -> D
+@@ -709,8 +720,7 @@ async fn cancel_input_response(request: &DaemonRequest, trusted_host: bool) -> D
      }
      if request.method == "interrupt_input" {
          let interrupted = tokio::task::spawn_blocking(|| {
@@ -745,7 +536,7 @@ index f499100..3949ad0 100644
          })
          .await;
          return match interrupted {
-@@ -756,8 +766,7 @@ async fn cancel_input_response(request: &DaemonRequest, trusted_host: bool) -> D
+@@ -728,8 +738,7 @@ async fn cancel_input_response(request: &DaemonRequest, trusted_host: bool) -> D
          };
      }
      let pending = tokio::task::spawn_blocking(|| {
@@ -755,7 +546,7 @@ index f499100..3949ad0 100644
      })
      .await;
      match pending {
-@@ -990,7 +999,7 @@ mod peer_authentication_tests {
+@@ -962,7 +971,7 @@ mod peer_authentication_tests {
          history_relaunch_state_response, shutdown_response, DaemonRequest, ToolObservationOrigin,
      };
  
@@ -764,7 +555,7 @@ index f499100..3949ad0 100644
      #[test]
      fn native_input_epoch_is_host_owned_required_and_not_read_from_tool_args() {
          let parse = |wire: &str, embedded, trusted| {
-@@ -1240,7 +1249,7 @@ pub async fn run_serve(
+@@ -1212,7 +1221,7 @@ pub async fn run_serve(
                          ).await;
  
                          match req.method.as_str() {
@@ -773,7 +564,7 @@ index f499100..3949ad0 100644
                              "cancel_input" | "interrupt_input" => {
                                  let resp = cancel_input_response(&req, trusted_host_connection).await;
                                  let _ = writer.write_all(
-@@ -1368,9 +1377,9 @@ pub async fn run_serve(
+@@ -1340,9 +1349,9 @@ pub async fn run_serve(
                                  ).await;
                              }
                              "call" => {
@@ -785,7 +576,7 @@ index f499100..3949ad0 100644
                                  let expected_epoch: Result<Option<u64>, String> = Ok(None);
                                  let resp = match expected_epoch {
                                      Ok(epoch) => invoke_daemon_tool(&reg, req, epoch).await,
-@@ -1603,12 +1612,11 @@ pub async fn run_serve(
+@@ -1575,12 +1584,11 @@ pub async fn run_serve(
      // Host EOF and explicit shutdown must close input admission and let native
      // owners submit their matching releases before task cancellation can drop
      // the SDK action lease. Keep the runtime alive if cleanup is still pending.

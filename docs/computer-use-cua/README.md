@@ -5,7 +5,7 @@ not a release certification. Results belong to the exact application, driver
 revision, platform and provider named in each report; an older passing fixture
 does not qualify the current branch.
 
-The current driver is Cua 0.28.2 with Synara native revision 39. The
+The current driver is Cua 0.34.1 with Synara native revision 40. The
 [release manifest](../../packages/shared/src/cuaDriverRelease.json) is the source
 of truth for source, patch checksum and Rust version. Packaging must verify the
 staged artifact against that manifest. The checked-in
@@ -14,6 +14,9 @@ staged artifact against that manifest. The checked-in
 [Linux browser patch](../../apps/desktop/patches/cua-driver/0002-synara-linux-browser.patch)
 adds a narrow headless-browser runtime; it does not inherit macOS desktop-input
 guarantees. Its runtime admission requirements are listed below.
+
+The [revision 40 upgrade report](upgrade-0.34.1-2026-10-10.md) records the rebase,
+source build and qualification results for Cua 0.34.1.
 
 The [remote-feedback follow-up](remote-feedback-fixes-2026-09-21.md) describes
 the current input, provider and concurrency corrections and their runtime limits.
