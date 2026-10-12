@@ -10,6 +10,7 @@ import { useState } from "react";
 import { CodeEditorPane } from "~/components/codeEditor/CodeEditorPane";
 import { CodeDiffEditorPane } from "~/components/codeEditor/CodeDiffEditorPane";
 import { SettingsRow, SettingsSection } from "~/components/settings/SettingsPanelPrimitives";
+import { enableAgentResourceVisibility } from "./skillsSettingsModel";
 import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";
 import { useTheme } from "~/hooks/useTheme";
@@ -98,11 +99,12 @@ function useAgentSetupController() {
       if (resource.ownership.startsWith("managed")) {
         if (enabled) {
           const settings = await api.server.getSettings();
-          const keys = new Set(
-            [resource.name, resource.id, ...resource.aliases].map((key) => key.toLowerCase()),
+          const next = enableAgentResourceVisibility(
+            settings.skills.disabled,
+            resource,
+            inventory?.resources ?? [],
           );
-          const next = settings.skills.disabled.filter((key) => !keys.has(key.toLowerCase()));
-          if (next.length !== settings.skills.disabled.length) {
+          if (JSON.stringify(next) !== JSON.stringify(settings.skills.disabled)) {
             queryClient.setQueryData(
               serverQueryKeys.settings(),
               await api.server.updateSettings({ skills: { disabled: next } }),
@@ -121,28 +123,29 @@ function useAgentSetupController() {
         setMessage("Enablement saved. Apply a preview to change native discovery.");
       } else {
         // Legacy names remain compatible. This only controls Synara's picker.
-        const names = new Set((await api.server.getSettings()).skills.disabled);
-        if (enabled) {
-          const keys = new Set(
-            [resource.name, ...resource.aliases].map((key) => key.toLowerCase()),
-          );
-          const legacy = [...names].filter((name) => keys.has(name.toLowerCase()));
-          if (legacy.length) {
-            for (const other of inventory?.resources ?? [])
-              if (
-                other.kind === "skill" &&
-                other.id !== resource.id &&
-                keys.has(other.name.toLowerCase())
-              )
-                names.add(other.id);
-            for (const name of legacy) names.delete(name);
-          }
-          names.delete(resource.id);
-        } else names.add(resource.id);
+        const previous = (await api.server.getSettings()).skills.disabled;
+        const names = enabled
+          ? enableAgentResourceVisibility(previous, resource, inventory?.resources ?? [])
+          : [...new Set([...previous, resource.id])].toSorted();
         const settings = await api.server.updateSettings({
-          skills: { disabled: [...names].toSorted() },
+          skills: { disabled: names },
         });
         queryClient.setQueryData(serverQueryKeys.settings(), settings);
+        const registry = await api.agentSetup.readResource({ id: "agent-setup-registry" });
+        const manifest = registry.content.trim()
+          ? (JSON.parse(registry.content) as AgentSetupManifest)
+          : null;
+        if (
+          manifest?.resources.some((item) => item.id === resource.id && item.enabled !== enabled)
+        ) {
+          await api.agentSetup.saveResource({
+            id: registry.id,
+            file: registry.file,
+            expectedRevision: registry.revision,
+            content: `${JSON.stringify({ ...manifest, resources: manifest.resources.map((item) => (item.id === resource.id ? { ...item, enabled } : item)) }, null, 2)}\n`,
+          });
+          setPlan(null);
+        }
         setMessage(
           "Synara visibility changed. This client-owned resource keeps its native enablement.",
         );

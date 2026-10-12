@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSettingsSkillGroups,
   buildSettingsSkillSectionsFromGroups,
+  enableAgentResourceVisibility,
 } from "./skillsSettingsModel";
 
 function skill(partial: Partial<ProviderSkillDescriptor>): ProviderSkillDescriptor {
@@ -82,5 +83,35 @@ describe("buildSettingsSkillGroups", () => {
     ]);
     expect(groups).toHaveLength(3);
     expect(groups.every((group) => group.sources.length === 1)).toBe(true);
+  });
+});
+
+describe("resource visibility", () => {
+  const shared = {
+    id: "skill:review",
+    name: "review",
+    aliases: ["check-code"],
+    kind: "skill" as const,
+  };
+  const native = { id: "external:native", name: "review", aliases: [], kind: "skill" as const };
+  const alias = {
+    id: "external:alias",
+    name: "other-review",
+    aliases: ["check-code"],
+    kind: "skill" as const,
+  };
+  it("enables one shared resource while preserving legacy restrictions on same-name and alias variants", () => {
+    expect(
+      enableAgentResourceVisibility(["REVIEW", "check-code", "unrelated"], shared, [
+        shared,
+        native,
+        alias,
+      ]),
+    ).toEqual(["external:alias", "external:native", "unrelated"]);
+  });
+  it("removes only the selected identity when no legacy name restriction applies", () => {
+    expect(
+      enableAgentResourceVisibility([shared.id, native.id, "unrelated"], shared, [shared, native]),
+    ).toEqual([native.id, "unrelated"]);
   });
 });

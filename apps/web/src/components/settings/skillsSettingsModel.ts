@@ -3,9 +3,42 @@
 // Layer: Settings UI logic
 // Exports: origin metadata, canonical skill grouping, and section ordering helpers.
 
-import type { ProviderKind, ProviderSkillDescriptor } from "@synara/contracts";
+import type {
+  AgentResourceDescriptor,
+  ProviderKind,
+  ProviderSkillDescriptor,
+} from "@synara/contracts";
 import { PROVIDER_DISPLAY_NAMES } from "@synara/contracts";
 import { DEFAULT_PROVIDER_ORDER } from "~/providerOrdering";
+
+type VisibilityResource = Pick<AgentResourceDescriptor, "id" | "name" | "aliases" | "kind">;
+
+/** Expand legacy name restrictions before enabling one resource with a stable identity. */
+export function enableAgentResourceVisibility(
+  disabled: readonly string[],
+  resource: VisibilityResource,
+  resources: readonly VisibilityResource[],
+): string[] {
+  const keys = new Set(
+    [resource.id, resource.name, ...resource.aliases].map((key) => key.toLowerCase()),
+  );
+  const legacy = new Set(
+    disabled
+      .filter(
+        (key) => key.toLowerCase() !== resource.id.toLowerCase() && keys.has(key.toLowerCase()),
+      )
+      .map((key) => key.toLowerCase()),
+  );
+  const next = new Set(disabled.filter((key) => !keys.has(key.toLowerCase())));
+  for (const other of resources)
+    if (
+      other.kind === "skill" &&
+      other.id !== resource.id &&
+      [other.name, ...other.aliases].some((key) => legacy.has(key.toLowerCase()))
+    )
+      next.add(other.id);
+  return [...next].toSorted();
+}
 
 export interface SkillOriginInfo {
   readonly label: string;
